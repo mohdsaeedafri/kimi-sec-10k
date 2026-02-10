@@ -1,0 +1,17 @@
+# Core Dependencies
+streamlit>=1.28.0
+plotly>=5.18.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Database
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+cryptography>=41.0.0  # For MySQL SSL
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Optional Enhancements
+# streamlit-aggrid>=0.3.4  # Advanced data grids
+# streamlit-option-menu>=0.3.6  # Enhanced navigation
