@@ -13,7 +13,6 @@ class Company:
     name: str
     name_coresight: Optional[str]
     exchange: Optional[str]
-    source: Optional[str]
     
     @property
     def display_name(self) -> str:

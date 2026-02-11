@@ -49,84 +49,127 @@ def render_company_selector(companies: List[Company], selected_ticker: str):
     
     return selected_company
 
-
 def render_tabs(selected_tab: str) -> str:
-    """Render the three tabs."""
     tabs = ["income_statement", "key_stats", "company_profile"]
     tab_labels = ["Income Statement", "Key Stats", "Company Profile"]
-    
-    # Create tab buttons
-    cols = st.columns([1, 1, 1, 3])  # 3 tabs + empty space
-    
+
+    cols = st.columns([1, 1, 1, 3])
+
     for i, (tab_key, label) in enumerate(zip(tabs, tab_labels)):
         with cols[i]:
             is_active = selected_tab == tab_key
+
             if is_active:
                 st.markdown(f"""
                 <div style="
                     color: #d62e2f;
                     font-weight: 600;
-                    font-size: 14px;
-                    padding: 12px 0;
+                    font-size: 16px;
                     border-bottom: 2px solid #d62e2f;
                     text-align: center;
-                ">{label}</div>
+                    height: 42px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                    z-index: 1;
+                ">
+                {label}
+                </div>
                 """, unsafe_allow_html=True)
             else:
-                if st.button(label, key=f"tab_{tab_key}", type="tertiary"):
+                if st.button(label, key=f"tab_{tab_key}", type="tertiary", use_container_width=True):
                     set_marketdata_tab(tab_key)
                     st.rerun()
-    
-    st.markdown("<hr style='margin: 0 0 20px 0; border-top: 1px solid #dee2e6;'>", unsafe_allow_html=True)
-    
+
+    st.markdown("""
+        <style>
+            .tabs-hr-wrapper {
+                margin-top: -1.5rem;
+            }
+        </style>
+        <div class="tabs-hr-wrapper">
+            <hr style="border: none; border-top: 2px solid #dee2e6; margin: 0;">
+        </div>
+    """, unsafe_allow_html=True)
+
     return selected_tab
+
+# def render_tabs(selected_tab: str) -> str:
+#     """Render the three tabs."""
+#     tabs = ["income_statement", "key_stats", "company_profile"]
+#     tab_labels = ["Income Statement", "Key Stats", "Company Profile"]
+    
+#     # Create tab buttons
+#     cols = st.columns([1, 1, 1, 3])  # 3 tabs + empty space
+    
+#     for i, (tab_key, label) in enumerate(zip(tabs, tab_labels)):
+#         with cols[i]:
+#             is_active = selected_tab == tab_key
+#             if is_active:
+#                 st.markdown(f"""
+#                 <div style="
+#                     color: #d62e2f;
+#                     font-weight: 600;
+#                     font-size: 16px;
+#                     padding-bottom: 4px;
+#                     border-bottom: 2px solid #d62e2f;
+#                     text-align: center;
+#                 ">{label}</div>
+#                 """, unsafe_allow_html=True)
+                
+#             else:
+#                 if st.button(label, key=f"tab_{tab_key}", type="tertiary", use_container_width=True):
+#                     set_marketdata_tab(tab_key)
+#                     st.rerun()
+            
+#     st.markdown("<hr style='border: none; border-top: 1px solid #dee2e6; margin: 0;'>", unsafe_allow_html=True)
+    
+#     return selected_tab
 
 
 def render_filters_row(
-    sources: List[str],
-    selected_source: str,
+    # sources: List[str],
+    # selected_source: str,
     available_dates: List[date],
     start_date: date,
     end_date: date
 ):
     """Render the filter row with Data Source, PDFs, and Date pickers."""
-    col1, col2, col3, col4, col5 = st.columns([1.5, 2, 1.5, 1.5, 0.5])
+    col1,col2, col3, col4 = st.columns([4, 1.5, 1, 1])
     
     with col1:
-        st.markdown("<div style='color: #6c757d; font-size: 12px; margin-bottom: 4px;'>Data Source</div>", unsafe_allow_html=True)
-        new_source = st.selectbox(
-            "Data Source",
-            options=sources,
-            index=sources.index(selected_source) if selected_source in sources else 0,
-            label_visibility="collapsed",
-            key="data_source_select"
-        )
-        if new_source != selected_source:
-            set_marketdata_source(new_source)
-            # Reset company when source changes
-            st.rerun()
+        pass
+        # st.markdown("<div style='color: #6c757d; font-size: 14px; margin-bottom: 6px; text-align:center'>Data Source</div>", unsafe_allow_html=True)
+        # new_source = st.selectbox(
+        #     "Data Source",
+        #     options=sources,
+        #     index=sources.index(selected_source) if selected_source in sources else 0,
+        #     label_visibility="collapsed",
+        #     key="data_source_select"
+        # )
+        # if new_source != selected_source:
+        #     set_marketdata_source(new_source)
+        #     # Reset company when source changes
+        #     st.rerun()
+    # with col9:
+    #     st.markdown("&nbsp;")
     
     with col2:
-        st.markdown("<div style='color: #6c757d; font-size: 12px; margin-bottom: 4px;'>&nbsp;</div>", unsafe_allow_html=True)
-        # PDF icons row
+        st.markdown("<div style='margin-bottom:4px;'>&nbsp;</div>", unsafe_allow_html=True)
+
         pdf_col1, pdf_col2 = st.columns([1, 1])
+
         with pdf_col1:
-            st.markdown("""
-            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                <span style="font-size: 13px; color: #212529;">10-K</span>
-                <span style="color: #d62e2f;">📄</span>
-            </div>
-            """, unsafe_allow_html=True)
+            if st.button("10-K 📑", key="10k", use_container_width=True):
+                print("10-K clicked")
+
         with pdf_col2:
-            st.markdown("""
-            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
-                <span style="font-size: 13px; color: #212529;">10-Q</span>
-                <span style="color: #d62e2f;">📄</span>
-            </div>
-            """, unsafe_allow_html=True)
+            if st.button("10-Q 📑", key="10q", use_container_width=True):
+                print("10-Q clicked")
     
     with col3:
-        st.markdown("<div style='color: #6c757d; font-size: 12px; margin-bottom: 4px;'>Start Date</div>", unsafe_allow_html=True)
+        st.markdown("<div style='color: #6c757d; font-size: 14px; margin-bottom: 6px; text-align: center;'>Start Date</div>", unsafe_allow_html=True)
         date_options = [d.strftime("%B %Y") for d in available_dates]
         date_values = {d.strftime("%B %Y"): d for d in available_dates}
         
@@ -146,7 +189,7 @@ def render_filters_row(
         new_start_date = date_values.get(new_start_label, start_date)
     
     with col4:
-        st.markdown("<div style='color: #6c757d; font-size: 12px; margin-bottom: 4px;'>End Date</div>", unsafe_allow_html=True)
+        st.markdown("<div style='color: #6c757d; font-size: 14px; margin-bottom: 6px; text-align: center; margin-left: 10px;'>End Date</div>", unsafe_allow_html=True)
         current_end_label = end_date.strftime("%B %Y")
         if current_end_label in date_options:
             end_index = date_options.index(current_end_label)
@@ -162,119 +205,167 @@ def render_filters_row(
         )
         new_end_date = date_values.get(new_end_label, end_date)
     
-    with col5:
-        st.markdown("&nbsp;")
+    # with col5:
+    #     st.markdown("&nbsp;")
     
     # Validate date range
     if new_start_date > new_end_date:
         st.error("Start date must be before end date")
-        return start_date, end_date, new_source
+        return start_date, end_date
     
     # Save if changed
     if new_start_date != start_date or new_end_date != end_date:
         set_marketdata_date_range(new_start_date.isoformat(), new_end_date.isoformat())
         st.rerun()
     
-    return new_start_date, new_end_date, new_source
+    return new_start_date, new_end_date
 
 
 def render_income_statement_table(data: IncomeStatementData):
-    """Render the income statement table."""
+    """Render the income statement table matching screenshot design."""
     if not data.periods or not data.line_items:
         st.info("No data available for selected date range")
         return
     
     # Build table header
     header_cols = ["For Fiscal Period Ending"] + [p.label.replace("\n", "<br>") for p in data.periods]
+    num_cols = len(header_cols)
     
-    # Start table HTML
+    # Sub-total / section-summary rows get bold + light bg
+    subtotal_labels = {
+        "Total Revenue", "Gross Profit", "Operating Income",
+        "Other Operating Exp., Total", "Net Interest Exp."
+    }
+    # Indented child rows (shown with padding-left in the screenshot)
+    indented_labels = {
+        "Total Revenue", "Gross Profit", "Operating Income",
+        "Other Operating Exp., Total", "Net Interest Exp."
+    }
+    # Section-starting rows: draw a heavier top border to visually group
+    section_start_labels = {
+        "Cost Of Goods Sold", "Selling General & Admin Exp.",
+        "Other Operating Expense/(Income)", "Interest Expense"
+    }
+
+    # --- Table CSS ---
     table_html = """
     <style>
     .income-table {
         width: 100%;
         border-collapse: collapse;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 13px;
-        margin-top: 10px;
+        margin-top: 8px;
     }
     .income-table th {
-        background-color: #f8f9fa;
-        padding: 12px 8px;
+        padding: 10px 12px;
         text-align: center;
         font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
+        font-size: 12px;
+        color: #212529;
+        border-bottom: 1px solid #dee2e6;
+        background: #fff;
     }
     .income-table th:first-child {
         text-align: left;
-        background-color: #fff;
     }
     .income-table td {
-        padding: 10px 8px;
-        border-bottom: 1px solid #e9ecef;
+        padding: 7px 12px;
+        border-bottom: 1px solid #eee;
         text-align: right;
+        font-size: 13px;
+        color: #212529;
     }
     .income-table td:first-child {
         text-align: left;
-        font-weight: 500;
+        color: #212529;
     }
-    .income-table tr:hover {
-        background-color: #f8f9fa;
+    .income-table .subtotal-row td {
+        font-weight: 600;
     }
-    .subheader {
+    .income-table .indented-label {
+        padding-left: 24px;
+    }
+    .income-table .section-start td {
+        border-top: 1px solid #ccc;
+    }
+    .income-table .sub-text {
         color: #6c757d;
         font-size: 11px;
-        font-weight: normal;
-    }
-    .total-row {
-        font-weight: 600;
-        background-color: #f8f9fa;
+        font-style: italic;
     }
     </style>
     <table class="income-table">
     """
-    
+
     # Header row
     table_html += "<tr>"
     for i, col in enumerate(header_cols):
         align = "left" if i == 0 else "center"
-        table_html += f'<th style="text-align: {align};">{col}</th>'
+        table_html += f'<th style="text-align:{align};">{col}</th>'
     table_html += "</tr>"
-    
-    # Subheader row
-    table_html += '<tr><td colspan="' + str(len(header_cols)) + '" style="text-align: left; padding: 4px 8px; color: #6c757d; font-size: 11px; border-bottom: none;">Millions of trading current, except per share items.</td></tr>'
-    
+
+    # Subheader row (italic note)
+    table_html += (
+        f'<tr><td class="sub-text" colspan="{num_cols}" '
+        f'style="border-bottom:none; padding: 2px 12px 6px;">'
+        f'Millions of trading current, except per share items.</td></tr>'
+    )
+
     # Data rows
     for item in data.line_items:
-        row_class = ' class="total-row"' if "Total" in item.label or item.label in ["Gross Profit", "Operating Income"] else ""
-        table_html += f"<tr{row_class}>"
-        table_html += f'<td>{item.label}</td>'
+        classes = []
+        if item.label in subtotal_labels:
+            classes.append("subtotal-row")
+        if item.label in section_start_labels:
+            classes.append("section-start")
+        class_attr = f' class="{" ".join(classes)}"' if classes else ""
+
+        table_html += f"<tr{class_attr}>"
+
+        # Label cell — indent sub-items
+        if item.label in indented_labels:
+            table_html += f'<td class="indented-label">{item.label}</td>'
+        else:
+            table_html += f'<td>{item.label}</td>'
+
+        # Value cells
         for value in item.values:
             formatted = format_value(value)
             table_html += f'<td>{formatted}</td>'
         table_html += "</tr>"
-    
+
     table_html += "</table>"
-    
     st.markdown(table_html, unsafe_allow_html=True)
+
+    # --- Currency Conversion section (bottom of screenshot) ---
+    st.markdown("""<div style="margin-top:24px; padding-top:16px; border-top:1px solid #eee;">
+        <div style="font-size:12px; color:#6c757d; margin-bottom:6px;">Currency Conversion</div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:13px; color:#212529;">
+            <span style="border:1px solid #dee2e6; border-radius:4px; padding:5px 12px;">Trading Currency</span>
+            <span style="color:#6c757d;">→</span>
+            <span style="border:1px solid #dee2e6; border-radius:4px; padding:5px 12px;">Conversion ▾</span>
+        </div>
+    </div>""", unsafe_allow_html=True)
 
 
 def render_page():
     """Main render function for Market Data page."""
-    render_styles()
     
     # Get all data sources
-    sources = CompanyRepository.get_all_sources()
-    if not sources:
-        st.error("No data sources available")
-        return
+    # sources = CompanyRepository.get_all_sources()
+    # if not sources:
+    #     st.error("No data sources available")
+    #     return
     
-    # Get stored values or defaults
-    stored_source = get_marketdata_source()
-    selected_source = stored_source if stored_source in sources else sources[0]
+    # # Get stored values or defaults
+    # stored_source = get_marketdata_source()
+    # selected_source = stored_source if stored_source in sources else sources[0]
     
     # Get companies for selected source
-    companies = CompanyRepository.get_companies_by_source(selected_source)
+    companies = CompanyRepository.get_companies_by_source()
     if not companies:
-        st.error(f"No companies found for source: {selected_source}")
+        st.error(f"No companies found")
         return
     
     stored_ticker = get_marketdata_company()
@@ -333,10 +424,11 @@ def render_page():
     
     # Render tabs
     selected_tab = render_tabs(selected_tab)
+    # st.markdown("<hr style='margin: 0 0 20px 0; border: none; border-top: 100px solid #dee2e6;'>", unsafe_allow_html=True)
     
     # Render filters row
-    start_date, end_date, selected_source = render_filters_row(
-        sources, selected_source, available_dates, start_date, end_date
+    start_date, end_date = render_filters_row(
+        available_dates, start_date, end_date
     )
     
     # Render content based on selected tab
@@ -352,7 +444,15 @@ def render_page():
                 st.error(f"Error loading financial data: {e}")
     
     elif selected_tab == "key_stats":
-        st.info("Key Stats tab - Coming soon")
+        # st.info("Key Stats tab - Coming soon")
+        try:
+                data = IncomeStatementRepository.get_income_statement_data(
+                    selected_ticker, start_date, end_date
+                )
+                render_income_statement_table(data)
+        except Exception as e:
+                st.error(f"Error loading financial data: {e}")
+
     
     elif selected_tab == "company_profile":
         st.info("Company Profile tab - Coming soon")

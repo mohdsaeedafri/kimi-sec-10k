@@ -129,10 +129,7 @@ def render_header(full_width: bool = True):
     .main > div:first-child {{
         padding-top: 0 !important;
     }}
-    /* Hide extra hr separators from Streamlit */
-    hr {{
-        display: none !important;
-    }}
+    
     /* Prevent horizontal scroll */
     html, body {{
         overflow-x: hidden !important;

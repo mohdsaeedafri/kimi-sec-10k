@@ -22,7 +22,11 @@
             "module": "streamlit",
             "args": [
                 "run",
-                "${workspaceFolder}/app/marketdata.py"
+                "${workspaceFolder}/app/marketdata.py",
+                "--server.runOnSave",
+                "true",
+                "--server.headless",
+                "true"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",

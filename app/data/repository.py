@@ -19,21 +19,20 @@ class CompanyRepository:
         return [row['source'] for row in results if row['source']]
     
     @staticmethod
-    def get_companies_by_source(source: str) -> List[Company]:
+    def get_companies_by_source() -> List[Company]:
         """Get all companies for a data source."""
         query = """
-            SELECT ticker, name, name_coresight, exchange, source
+            SELECT ticker, name, name_coresight, exchange
             FROM coreiq_companies
-            WHERE source = :source
+            WHERE source = 'SEC'
             ORDER BY name_coresight, name
         """
-        results = db_manager.execute_query(query, {"source": source})
+        results = db_manager.execute_query(query)
         return [Company(
             ticker=row['ticker'],
             name=row['name'],
             name_coresight=row['name_coresight'],
             exchange=row['exchange'],
-            source=row['source']
         ) for row in results]
     
     @staticmethod
@@ -54,7 +53,6 @@ class CompanyRepository:
             name=row['name'],
             name_coresight=row['name_coresight'],
             exchange=row['exchange'],
-            source=row['source']
         )
 
 
@@ -104,7 +102,7 @@ class IncomeStatementRepository:
             FROM coreiq_av_financials_income_statement
             WHERE ticker = :ticker
               AND report_type = 'annual'
-            ORDER BY fiscal_date_ending DESC
+            ORDER BY fiscal_date_ending ASC
         """
         results = db_manager.execute_query(query, {"ticker": ticker})
         return [row['fiscal_date_ending'] for row in results]
@@ -128,7 +126,7 @@ class IncomeStatementRepository:
             WHERE ticker = :ticker
               AND fiscal_date_ending BETWEEN :start_date AND :end_date
               AND report_type = 'annual'
-            ORDER BY fiscal_date_ending DESC
+            ORDER BY fiscal_date_ending ASC
         """
         results = db_manager.execute_query(query, {
             "ticker": ticker,
