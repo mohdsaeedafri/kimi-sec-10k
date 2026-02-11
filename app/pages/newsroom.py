@@ -50,6 +50,42 @@ def format_company_display(ticker: str, company_map: dict) -> str:
     return company_map.get(ticker, ticker)
 
 
+def calculate_relative_time(published_time: datetime) -> str:
+    """Calculate relative time string on server side."""
+    try:
+        now = datetime.now(published_time.tzinfo) if published_time.tzinfo else datetime.now()
+        if not published_time.tzinfo:
+            published_time = published_time.replace(tzinfo=None)
+            now = now.replace(tzinfo=None)
+        
+        diff = now - published_time
+        diff_seconds = diff.total_seconds()
+        
+        if diff_seconds < 0:
+            return '(just now)'
+        
+        diff_mins = int(diff_seconds / 60)
+        diff_hours = int(diff_seconds / 3600)
+        diff_days = int(diff_seconds / 86400)
+        
+        if diff_mins < 1:
+            return '(just now)'
+        elif diff_mins < 60:
+            return f'({diff_mins} minute{"s" if diff_mins != 1 else ""} ago)'
+        elif diff_hours < 24:
+            remaining_mins = diff_mins % 60
+            if remaining_mins == 0:
+                return f'({diff_hours} hour{"s" if diff_hours != 1 else ""} ago)'
+            else:
+                return f'({diff_hours} hour{"s" if diff_hours != 1 else ""}, {remaining_mins} minute{"s" if remaining_mins != 1 else ""} ago)'
+        elif diff_days == 1:
+            return '(1 day ago)'
+        else:
+            return f'({diff_days} days ago)'
+    except Exception:
+        return ''
+
+
 def render_news_card(article: NewsArticle, company_map: dict):
     """
     Render a single news article card using custom HTML/CSS.
@@ -57,6 +93,9 @@ def render_news_card(article: NewsArticle, company_map: dict):
     """
     # Format the date
     formatted_date = article.formatted_date
+    
+    # Calculate relative time server-side
+    relative_time = calculate_relative_time(article.time_published)
     
     # Build tagged companies HTML with tooltips
     tagged_companies_html = ""
@@ -72,16 +111,16 @@ def render_news_card(article: NewsArticle, company_map: dict):
         
         tagged_companies_html = "<span class='tagged-label'>Tagged Companies: </span>" + " | ".join(companies_parts)
     
-    # Build the card HTML
+    # Build the card HTML - Title is a link but styled as black text without underline
     card_html = f"""
     <div class="news-card">
         <div class="news-header">
             <div class="news-source">{article.source}</div>
-            <div class="news-date">{formatted_date} <span class="relative-time" data-timestamp="{article.time_published.isoformat()}"></span></div>
+            <div class="news-date">
+                {formatted_date} <span class="relative-time">{relative_time}</span>
+            </div>
         </div>
-        <div class="news-title">
-            <a href="{article.url}" target="_blank" class="title-link">{article.title}</a>
-        </div>
+        <a href="{article.url}" target="_blank" class="news-title-link">{article.title}</a>
         <div class="news-summary">{article.summary}</div>
         {f'<div class="tagged-companies">{tagged_companies_html}</div>' if tagged_companies_html else ''}
     </div>
@@ -134,25 +173,28 @@ def get_news_css() -> str:
     
     .relative-time {
         color: #888888;
+        font-weight: 700;
     }
     
-    .news-title {
-        margin-bottom: 12px;
-    }
-    
-    .title-link {
+    .news-title-link {
         font-family: 'Montserrat', sans-serif;
         font-weight: 700;
         font-size: 20px;
         line-height: 24px;
         letter-spacing: -0.28px;
-        color: #000000;
-        text-decoration: none;
+        color: #000000 !important;
+        text-decoration: none !important;
+        margin-bottom: 12px;
         display: block;
     }
     
-    .title-link:hover {
-        color: #d62e2f;
+    /* Ensure title link is black and not underlined */
+    .news-title-link,
+    .news-title-link:hover,
+    .news-title-link:active,
+    .news-title-link:visited {
+        color: #000000 !important;
+        text-decoration: none !important;
     }
     
     .news-summary {
@@ -191,11 +233,10 @@ def get_news_css() -> str:
     }
     
     /* Override Streamlit's default link colors */
-    a.company-link {
-        color: #d62e2f !important;
-    }
-    
-    a.company-link:visited {
+    a.company-link,
+    a.company-link:visited,
+    a.company-link:hover,
+    a.company-link:active {
         color: #d62e2f !important;
     }
     
@@ -222,79 +263,6 @@ def get_news_css() -> str:
         margin-bottom: 16px;
     }
     </style>
-    """
-
-
-def get_relative_time_js() -> str:
-    """JavaScript for calculating relative time from browser's current time."""
-    return """
-    <script>
-    (function() {
-        function formatRelativeTime(publishedTime) {
-            try {
-                const now = new Date();
-                const published = new Date(publishedTime);
-                
-                // Check if valid date
-                if (isNaN(published.getTime())) {
-                    return '';
-                }
-                
-                const diffMs = now - published;
-                
-                // If future date or invalid difference
-                if (diffMs < 0) {
-                    return '(just now)';
-                }
-                
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffMs / 86400000);
-                
-                if (diffMins < 1) {
-                    return '(just now)';
-                } else if (diffMins < 60) {
-                    return '(' + diffMins + ' minute' + (diffMins !== 1 ? 's' : '') + ' ago)';
-                } else if (diffHours < 24) {
-                    const remainingMins = diffMins % 60;
-                    if (remainingMins === 0) {
-                        return '(' + diffHours + ' hour' + (diffHours !== 1 ? 's' : '') + ' ago)';
-                    } else {
-                        return '(' + diffHours + ' hour' + (diffHours !== 1 ? 's' : '') + ', ' + remainingMins + ' minute' + (remainingMins !== 1 ? 's' : '') + ' ago)';
-                    }
-                } else if (diffDays === 1) {
-                    return '(1 day ago)';
-                } else {
-                    return '(' + diffDays + ' days ago)';
-                }
-            } catch (e) {
-                console.error('Error formatting relative time:', e);
-                return '';
-            }
-        }
-        
-        // Update all relative time elements
-        function updateRelativeTimes() {
-            const elements = document.querySelectorAll('.relative-time');
-            elements.forEach(function(el) {
-                const timestamp = el.getAttribute('data-timestamp');
-                if (timestamp && !el.textContent.trim()) {
-                    const formatted = formatRelativeTime(timestamp);
-                    if (formatted) {
-                        el.textContent = formatted;
-                    }
-                }
-            });
-        }
-        
-        // Run immediately
-        updateRelativeTimes();
-        
-        // Also run after a short delay to catch dynamically loaded content
-        setTimeout(updateRelativeTimes, 500);
-        setTimeout(updateRelativeTimes, 1000);
-    })();
-    </script>
     """
 
 
@@ -439,10 +407,6 @@ def main():
         for article in articles:
             card_html = render_news_card(article, company_map)
             st.markdown(card_html, unsafe_allow_html=True)
-        
-        # Inject JavaScript for relative time calculation using components.v1 for proper JS execution
-        from streamlit.components.v1 import html as components_html
-        components_html(get_relative_time_js(), height=0, scrolling=False)
         
     else:
         st.info("No news articles found for the selected filters.")
