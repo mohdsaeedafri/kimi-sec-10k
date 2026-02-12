@@ -25,45 +25,41 @@ def format_value(value: Optional[float], conversion_rate: float = 1.0) -> str:
     return f"{converted:,.1f}"
 
 
+def is_bold_row(label: str) -> bool:
+    """Check if row should be bold (subtotal rows) per Figma."""
+    bold_labels = {"Total Revenue", "Gross Profit", "Other Operating Exp., Total",
+                   "Operating Income", "Net Interest Exp."}
+    return label in bold_labels
+
+
+def has_underline(label: str) -> bool:
+    """Check if row should have 2px dark grey underline per Figma."""
+    underline_labels = {"Total Revenue", "Gross Profit", "Other Operating Exp., Total",
+                        "Operating Income", "Net Interest Exp."}
+    return label in underline_labels
+
+
+def has_grey_separator(label: str) -> bool:
+    """Check if row should have 4px grey separator line below it per Figma."""
+    separator_labels = {"Total Revenue", "Gross Profit", "Operating Income"}
+    return label in separator_labels
+
+
 def get_indent_level(label: str) -> int:
-    """Get indentation level based on row type."""
-    level_0 = {"Revenue", "Total Revenue", "Gross Profit", "Operating Income"}
-    level_1 = {"Other Revenue", "Cost Of Goods Sold", "Selling General & Admin Exp.",
-               "R&D Exp.", "Depreciation & Amort.", "Other Operating Expense/(Income)",
-               "Other Operating Exp., Total", "Interest Expense", "Interest and Invest. Income",
-               "Net Interest Exp."}
+    """Get indentation level based on row type - 0=normal (12px), 1=indented (24px)."""
+    # Level 1: SUBTOTAL/SUMMARY rows - INDENTED (24px left padding)
+    level_1 = {"Total Revenue", "Gross Profit", "Other Operating Exp., Total",
+               "Operating Income", "Net Interest Exp."}
     
-    if label in level_0:
-        return 0
-    elif label in level_1:
-        return 1
-    return 1
-
-
-def is_gray_text(label: str) -> bool:
-    """Check if row should have gray text - ONLY specific rows per Figma."""
-    gray_labels = {"R&D Exp.", "Depreciation & Amort.", "Other Operating Expense/(Income)",
-                   "Interest and Invest. Income"}
-    return label in gray_labels
-
-
-def get_underline_style(label: str) -> str:
-    """
-    Get underline style based on row type per Figma:
-    - 'grey': Light grey underline (85% width, starts after indent)
-    - 'black': Darker underline (90% width, for subtotals)
-    - 'none': No underline
-    """
-    grey_underline_rows = {"Other Revenue", "Cost Of Goods Sold", 
-                           "Other Operating Expense/(Income)", "Interest and Invest. Income"}
-    black_underline_rows = {"Total Revenue", "Gross Profit", "Other Operating Exp., Total",
-                           "Operating Income", "Net Interest Exp."}
+    # Level 0: Regular line items - NOT INDENTED (12px left padding)
+    # Revenue, Other Revenue, Cost Of Goods Sold, Selling General & Admin Exp.,
+    # R&D Exp., Depreciation & Amort., Other Operating Expense/(Income),
+    # Interest Expense, Interest and Invest. Income
     
-    if label in grey_underline_rows:
-        return "grey"
-    elif label in black_underline_rows:
-        return "black"
-    return "none"
+    if label in level_1:
+        return 1  # Subtotals are indented
+    else:
+        return 0  # Everything else is NOT indented
 
 
 def get_conversion_rate(from_currency: str, to_currency: str) -> float:
@@ -136,22 +132,51 @@ def render_page():
     # Get conversion rate
     conversion_rate = get_conversion_rate(reported_currency, st.session_state.target_currency)
     
-    # ==================== GLOBAL CSS - PIXEL PERFECT ====================
+    # ==================== GLOBAL CSS - PIXEL PERFECT FIGMA SPECS ====================
     st.html("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,600;0,700;1,400&display=swap');
     
     :root {
-        --primary-red: #D62E2F;
-        --dark-text: #111827;
-        --body-text: #374151;
-        --secondary-text: #6B7280;
-        --light-gray-text: #9CA3AF;
-        --border-light: #E5E7EB;
-        --border-medium: #D1D5DB;
-        --bg-light: #F9FAFB;
-        --bg-gray: #F3F4F6;
+        /* Figma Colors - Exact Match */
         --white: #FFFFFF;
+        --light-grey: #F9F9F9;
+        --black: #000000;
+        --dark-grey: #4F4F4F;
+        --border-light: #CFCFCF;
+        --border-medium: #C1CFCF;
+        
+        /* Accent Colors */
+        --primary-red: #D62E2F;
+        
+        /* Typography - Figma Specs */
+        --font-family: 'Roboto', sans-serif;
+        --font-size-base: 16px;
+        --font-size-small: 12px;
+        --line-height-base: 19px;
+        --line-height-compact: 100%;
+        
+        /* Font Weights */
+        --font-weight-regular: 400;
+        --font-weight-semibold: 600;
+        --font-weight-bold: 700;
+        
+        /* Spacing */
+        --padding-normal: 12px;
+        --padding-indented: 24px;
+        --padding-top: 4px;
+        --gap-small: 2px;
+        --gap-medium: 6px;
+        
+        /* Dimensions */
+        --header-height: 48px;
+        --row-height: 24px;
+        --border-width: 1px;
+        --underline-width: 2px;
+        
+        /* Column Widths */
+        --first-column-width: 400px;
+        --date-column-width: 164px;
     }
     
     /* Hide Streamlit elements */
@@ -160,9 +185,9 @@ def render_page():
     
     /* Page title */
     .page-title {
-        font-family: 'Inter', sans-serif;
-        font-weight: 700;
-        font-size: 12px;
+        font-family: var(--font-family);
+        font-weight: var(--font-weight-bold);
+        font-size: var(--font-size-small);
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--primary-red);
@@ -178,28 +203,28 @@ def render_page():
     }
     
     .company-name {
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
+        font-family: var(--font-family);
+        font-weight: var(--font-weight-semibold);
         font-size: 22px;
-        color: var(--dark-text);
+        color: var(--black);
     }
     
     .dropdown-chevron {
-        font-size: 12px;
-        color: var(--secondary-text);
+        font-size: var(--font-size-small);
+        color: var(--dark-grey);
     }
     
     /* Tabs */
     .tabs-container {
         display: flex;
         gap: 60px;
-        border-bottom: 1px solid var(--border-light);
+        border-bottom: var(--border-width) solid var(--border-light);
         margin-bottom: 30px;
     }
     
     .tab {
-        font-family: 'Inter', sans-serif;
-        font-size: 16px;
+        font-family: var(--font-family);
+        font-size: var(--font-size-base);
         padding: 12px 0;
         cursor: pointer;
         border-bottom: 3px solid transparent;
@@ -213,192 +238,226 @@ def render_page():
     }
     
     .tab-inactive {
-        color: var(--secondary-text);
-        font-weight: 400;
+        color: var(--dark-grey);
+        font-weight: var(--font-weight-regular);
     }
     
     /* Filter row */
     .date-label {
-        font-family: 'Inter', sans-serif;
-        font-size: 12px;
-        font-weight: 400;
-        color: var(--secondary-text);
+        font-family: var(--font-family);
+        font-size: var(--font-size-small);
+        font-weight: var(--font-weight-regular);
+        color: var(--dark-grey);
         margin-bottom: 6px;
     }
     
     /* Streamlit selectbox styling */
     div[data-testid="stSelectbox"] > div > div {
         background-color: var(--white) !important;
-        border: 1px solid var(--border-medium) !important;
+        border: var(--border-width) solid var(--border-light) !important;
         border-radius: 6px !important;
     }
     
     div[data-testid="stSelectbox"] > div > div > div {
         padding: 10px 14px !important;
-        font-family: 'Inter', sans-serif !important;
+        font-family: var(--font-family) !important;
         font-size: 14px !important;
-        color: var(--body-text) !important;
+        color: var(--black) !important;
     }
     
-    /* TABLE STYLING - PIXEL PERFECT FROM FIGMA */
+    /* ==================== TABLE STYLING - PIXEL PERFECT FROM FIGMA ==================== */
+    
     .table-container {
-        border: 1px solid var(--border-light);
+        border: var(--border-width) solid var(--border-light);
         border-radius: 8px;
         overflow: hidden;
         background: var(--white);
+        margin-bottom: 30px;
     }
     
     .table-scroll {
+        max-height: 600px;
         overflow-x: auto;
+        overflow-y: auto;
     }
     
     .data-table {
         width: 100%;
-        border-collapse: collapse;
-        font-family: 'Inter', sans-serif;
-        font-size: 14px;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-family: var(--font-family);
+        font-size: var(--font-size-base);
     }
     
-    /* Header - light grey background */
+    /* ========== HEADER ROW - 48px height, grey background ========== */
     .data-table thead {
-        background-color: var(--bg-light);
+        background-color: var(--light-grey);
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
     
     .data-table th {
-        padding: 16px;
+        height: var(--header-height);
+        padding: var(--padding-top) var(--padding-normal);
         text-align: left;
-        font-weight: 600;
-        border-bottom: 1px solid var(--border-light);
-        white-space: nowrap;
-        color: var(--dark-text);
+        font-weight: var(--font-weight-bold);
+        font-size: var(--font-size-base);
+        line-height: var(--line-height-base);
+        color: var(--black);
+        border-bottom: var(--border-width) solid var(--border-light);
+        background-color: var(--light-grey);
+        vertical-align: top;
+    }
+    
+    /* STICKY FIRST COLUMN */
+    .data-table th:first-child,
+    .data-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 5;
+        background-color: var(--light-grey);
     }
     
     .data-table th:first-child {
-        min-width: 280px;
-        background-color: var(--bg-light);
+        min-width: var(--first-column-width);
+        max-width: var(--first-column-width);
     }
     
+    .data-table td:first-child {
+        min-width: var(--first-column-width);
+        max-width: var(--first-column-width);
+    }
+    
+    /* Date column headers - right aligned */
     .data-table th.data-col {
-        text-align: center;
-        min-width: 140px;
+        text-align: right;
+        min-width: var(--date-column-width);
+        padding: var(--padding-top) var(--padding-top) var(--padding-top) var(--padding-normal);
     }
     
+    /* Header subtext */
     .header-subtext {
         display: block;
-        font-size: 11px;
-        font-weight: 400;
-        color: var(--secondary-text);
-        margin-top: 4px;
+        font-size: var(--font-size-small);
+        font-weight: var(--font-weight-regular);
+        font-style: italic;
+        color: var(--dark-grey);
+        margin-top: var(--gap-small);
+        line-height: var(--line-height-compact);
     }
     
+    /* Period labels in header */
     .period-label {
         display: block;
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--secondary-text);
-        margin-bottom: 2px;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
+        color: var(--black);
+        line-height: var(--line-height-compact);
+        text-align: right;
     }
     
     .period-date {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--dark-text);
+        display: block;
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-bold);
+        color: var(--black);
+        line-height: var(--line-height-compact);
+        text-align: right;
+        margin-top: var(--gap-small);
     }
     
-    /* Table body */
+    /* ========== DATA ROWS - 24px height ========== */
+    .data-table tbody tr {
+        height: var(--row-height);
+    }
+    
     .data-table td {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border-light);
+        height: var(--row-height);
+        padding: var(--padding-top) var(--padding-normal);
+        border-bottom: var(--border-width) solid var(--border-light);
+        vertical-align: bottom;
+        font-size: var(--font-size-base);
+        line-height: var(--line-height-base);
+    }
+    
+    /* First column - label column */
+    .data-table td:first-child {
+        text-align: left;
+        background-color: var(--light-grey);
+        color: var(--black);
+        font-weight: var(--font-weight-regular);
         vertical-align: middle;
     }
     
-    /* FIRST COLUMN - LIGHT GREY BACKGROUND, BLACK TEXT */
-    .data-table td:first-child {
-        text-align: left;
-        background-color: var(--bg-light);
-        color: var(--dark-text);
-        font-weight: 500;
-    }
-    
+    /* Data cells - numbers */
     .data-table td.data-cell {
         text-align: right;
         font-variant-numeric: tabular-nums;
         background-color: var(--white);
+        color: var(--black);
+        font-weight: var(--font-weight-regular);
+        padding: var(--padding-top) 8px var(--padding-top) var(--padding-normal);
     }
     
-    /* Row text colors for data columns */
-    .row-text-dark {
-        color: var(--body-text);
+    /* ========== ROW INDENTATION ========== */
+    .indent-0 { 
+        padding-left: var(--padding-normal) !important; 
     }
     
-    .row-text-gray {
-        color: var(--secondary-text) !important;
+    .indent-1 { 
+        padding-left: var(--padding-indented) !important; 
+        background-color: var(--light-grey) !important;
     }
     
-    /* Indentation */
-    .indent-0 { padding-left: 16px !important; }
-    .indent-1 { padding-left: 36px !important; }
-    .indent-2 { padding-left: 56px !important; }
-    
-    /* Font weights */
-    .font-regular { font-weight: 400; }
-    .font-semibold { font-weight: 600; }
-    
-    /* PARTIAL UNDERLINE - GREY (85% width) */
-    .underline-grey td.data-cell {
-        border-top: 1px solid var(--border-medium);
-        background: linear-gradient(to right, transparent 15%, var(--border-medium) 15%, var(--border-medium) 100%, transparent 100%);
-        background-size: 100% 1px;
-        background-position: bottom;
-        background-repeat: no-repeat;
+    /* ========== BOLD ROWS (Subtotals) ========== */
+    .row-bold td:first-child {
+        font-weight: var(--font-weight-bold) !important;
+        color: var(--dark-grey) !important;
     }
     
-    /* PARTIAL UNDERLINE - BLACK (90% width, thicker) */
-    .underline-black td.data-cell {
-        border-top: 1px solid var(--dark-text);
-        font-weight: 600;
+    .row-bold td.data-cell {
+        font-weight: var(--font-weight-semibold) !important;
+        color: var(--dark-grey) !important;
     }
     
-    /* Alternative underline approach using pseudo-element simulation */
-    .row-underline-grey td.data-cell {
-        position: relative;
-    }
-    
-    .row-underline-grey td.data-cell::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 10%;
-        right: 5%;
-        height: 1px;
-        background-color: var(--border-medium);
-    }
-    
+    /* ========== UNDERLINES - 2px thick, dark grey ========== */
     .row-underline-black td.data-cell {
         position: relative;
     }
     
-    .row-underline-black td.data-cell::before {
+    .row-underline-black td.data-cell::after {
         content: '';
         position: absolute;
-        top: 0;
+        bottom: 0;
         left: 5%;
         right: 5%;
-        height: 1px;
-        background-color: var(--dark-text);
+        height: var(--underline-width);
+        background-color: var(--dark-grey);
     }
     
-    /* CURRENCY CONVERSION - LEFT SIDE ONLY */
+    /* ========== INDENTED ROW BACKGROUNDS ========== */
+    .row-indent-grey {
+        background-color: var(--light-grey) !important;
+    }
+    
+    /* ========== GREY SEPARATOR - 4px thick ========== */
+    .row-grey-separator td,
+    .row-grey-separator th {
+        border-bottom: 4px solid #CFCFCF;
+    }
+    
+    /* ========== CURRENCY CONVERSION - LEFT SIDE ONLY ========== */
     .currency-section {
         margin-top: 30px;
         max-width: 500px;
     }
     
     .currency-label {
-        font-family: 'Inter', sans-serif;
-        font-size: 12px;
-        font-weight: 400;
-        color: var(--secondary-text);
+        font-family: var(--font-family);
+        font-size: var(--font-size-small);
+        font-weight: var(--font-weight-regular);
+        color: var(--dark-grey);
         margin-bottom: 12px;
     }
     
@@ -410,17 +469,17 @@ def render_page():
     
     .currency-box {
         background: var(--white);
-        border: 1px solid var(--border-medium);
+        border: var(--border-width) solid var(--border-light);
         border-radius: 6px;
         padding: 12px 16px;
-        font-family: 'Inter', sans-serif;
+        font-family: var(--font-family);
         font-size: 14px;
-        color: var(--body-text);
+        color: var(--black);
         min-width: 160px;
     }
     
     .currency-arrow {
-        color: var(--light-gray-text);
+        color: var(--dark-grey);
         font-size: 18px;
         font-weight: 300;
     }
@@ -533,8 +592,8 @@ def render_page():
                 # Build table HTML
                 html = '<div class="table-container"><div class="table-scroll"><table class="data-table"><thead>'
                 
-                # Header row
-                html += '<tr><th>For Fiscal Period Ending<span class="header-subtext">Millions of trading currency, except per share items.</span></th>'
+                # Header row - with grey separator
+                html += '<tr class="row-grey-separator"><th>For Fiscal Period Ending<span class="header-subtext">Millions of trading currency, except per share items.</span></th>'
                 for period in data.periods:
                     lines = period.label.split('\n')
                     if len(lines) >= 2:
@@ -548,34 +607,36 @@ def render_page():
                 html += '</tr></thead><tbody>'
                 
                 # Data rows with currency conversion applied
-                for item in data.line_items:
+                prev_item_label = None
+                for i, item in enumerate(data.line_items):
                     indent = get_indent_level(item.label)
-                    is_gray = is_gray_text(item.label)
-                    underline_style = get_underline_style(item.label)
+                    is_bold = is_bold_row(item.label)
+                    needs_grey_sep = has_grey_separator(item.label)
                     
-                    # Determine text color class for data columns
-                    if is_gray:
-                        text_class = "row-text-gray"
-                    else:
-                        text_class = "row-text-dark"
+                    # Check if NEXT row needs underline, if so add it to THIS row
+                    next_item = data.line_items[i + 1] if i + 1 < len(data.line_items) else None
+                    needs_underline = has_underline(next_item.label) if next_item else False
                     
-                    # Determine underline class
-                    if underline_style == "grey":
-                        underline_class = "row-underline-grey"
-                    elif underline_style == "black":
-                        underline_class = "row-underline-black"
-                    else:
-                        underline_class = ""
+                    # Build row classes
+                    row_classes = []
+                    if is_bold:
+                        row_classes.append("row-bold")
+                    if needs_underline:
+                        row_classes.append("row-underline-black")
+                    if needs_grey_sep:
+                        row_classes.append("row-grey-separator")
                     
-                    html += f'<tr class="{underline_class}">'
+                    row_class_str = ' '.join(row_classes) if row_classes else ''
                     
-                    # First column - LIGHT GREY BACKGROUND, BLACK TEXT (per Figma)
+                    html += f'<tr class="{row_class_str}">'
+                    
+                    # First column - label with proper indentation
                     html += f'<td class="indent-{indent}">{item.label}</td>'
                     
                     # Data columns with converted values
                     for val in item.values:
                         formatted = format_value(val, conversion_rate)
-                        html += f'<td class="data-cell {text_class}">{formatted}</td>'
+                        html += f'<td class="data-cell">{formatted}</td>'
                     
                     html += '</tr>'
                 
