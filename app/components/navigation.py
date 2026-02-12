@@ -19,6 +19,7 @@ def render_header(full_width: bool = True):
     Shared between:
     - app/marketdata.py (Market Data page) -> URL: /marketdata
     - app/pages/newsroom.py (Newsroom page) -> URL: /newsroom
+    - app/pages/company_profile.py (Company Profile page) -> URL: /company_profile
     
     Parameters:
     -----------
@@ -29,16 +30,20 @@ def render_header(full_width: bool = True):
     
     # Detect which page is calling this function
     is_newsroom = False
+    is_company_profile = False
     for frame in inspect.stack():
         if 'newsroom.py' in frame.filename:
             is_newsroom = True
+            break
+        if 'company_profile.py' in frame.filename:
+            is_company_profile = True
             break
     
     # Active/inactive styles
     active_style = "color: #d62e2f; border-bottom: 2px solid #d62e2f; font-weight: 600;"
     inactive_style = "color: #323232; border-bottom: 2px solid transparent;"
     
-    market_style = active_style if not is_newsroom else inactive_style
+    market_style = active_style if (not is_newsroom and not is_company_profile) else inactive_style
     newsroom_style = active_style if is_newsroom else inactive_style
     
     # Full width or contained
@@ -141,6 +146,11 @@ def render_header(full_width: bool = True):
     </style>
     """, unsafe_allow_html=True)
     
+    # Use absolute URLs with ports for cross-page navigation in development
+    # This allows navigation between pages running on different ports
+    market_url = "http://localhost:8502/marketdata"
+    newsroom_url = "http://localhost:8503/newsroom"
+    
     # Header HTML with navigation links
     st.markdown(f"""
     <div class="coresight-header-container">
@@ -153,8 +163,8 @@ def render_header(full_width: bool = True):
             </div>
             <div style="display: flex; align-items: center;">
                 <div class="coresight-nav-links">
-                    <a href="/marketdata" class="coresight-nav-link" target="_self" style="{market_style}">Market Data</a>
-                    <a href="/newsroom" class="coresight-nav-link" target="_self" style="{newsroom_style}">Newsroom</a>
+                    <a href="{market_url}" class="coresight-nav-link" target="_self" style="{market_style}">Market Data</a>
+                    <a href="{newsroom_url}" class="coresight-nav-link" target="_self" style="{newsroom_style}">Newsroom</a>
                 </div>
                 <a href="https://coresight.com/about-us/contact/" target="_blank" class="coresight-contact-btn">Contact Us</a>
             </div>

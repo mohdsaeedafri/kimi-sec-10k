@@ -105,8 +105,8 @@ def render_news_card(article: NewsArticle, company_map: dict):
             company_name = format_company_display(ts.ticker, company_map)
             # Create tooltip content
             tooltip_text = f"Relevance: {float(ts.relevance_score)*100:.1f}% | Sentiment: {ts.ticker_sentiment_label} ({float(ts.ticker_sentiment_score):.2f})"
-            # Company link with custom tooltip
-            company_html = f'<a href="/company/{ts.ticker}" class="company-link" title="{tooltip_text}">{company_name}</a>'
+            # Company link with custom tooltip - links to company profile page
+            company_html = f'<a href="http://localhost:8504/company_profile?ticker={ts.ticker}" class="company-link" title="{tooltip_text}">{company_name}</a>'
             companies_parts.append(company_html)
         
         tagged_companies_html = "<span class='tagged-label'>Tagged Companies: </span>" + " | ".join(companies_parts)

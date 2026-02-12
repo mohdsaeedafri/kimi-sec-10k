@@ -8,7 +8,7 @@ import json
 from core.database import db_manager
 from data.models import (
     Company, IncomeStatementLineItem, FiscalPeriod, IncomeStatementData,
-    NewsArticle, TickerSentiment
+    NewsArticle, TickerSentiment, CompanyOverview
 )
 
 
@@ -175,6 +175,25 @@ class IncomeStatementRepository:
             periods=periods,
             line_items=line_items
         )
+    
+    @staticmethod
+    def get_reported_currency(ticker: str, fiscal_date: date) -> str:
+        """Get the reported currency for a specific fiscal period."""
+        query = """
+            SELECT reported_currency
+            FROM coreiq_av_financials_income_statement
+            WHERE ticker = :ticker
+              AND fiscal_date_ending = :fiscal_date
+              AND report_type = 'annual'
+            LIMIT 1
+        """
+        results = db_manager.execute_query(query, {
+            "ticker": ticker,
+            "fiscal_date": fiscal_date
+        })
+        if results and results[0].get('reported_currency'):
+            return results[0]['reported_currency']
+        return "USD"  # Default fallback
 
 
 class NewsRepository:
@@ -368,3 +387,127 @@ class NewsRepository:
         if results:
             return results[0]['display_name']
         return ticker  # Return ticker if company not found
+
+
+class CompanyOverviewRepository:
+    """Repository for coreiq_av_company_overview table."""
+    
+    @staticmethod
+    def get_company_overview(ticker: str) -> Optional[CompanyOverview]:
+        """
+        Get company overview by ticker.
+        
+        Args:
+            ticker: Company ticker symbol
+            
+        Returns:
+            CompanyOverview object or None if not found
+        """
+        query = """
+            SELECT 
+                ticker,
+                name,
+                exchange,
+                currency,
+                country,
+                sector,
+                industry,
+                company_description,
+                official_site,
+                fiscal_year_end,
+                cik,
+                market_capitalization,
+                pe_ratio,
+                eps,
+                dividend_yield,
+                analyst_target_price,
+                raw_json,
+                fetched_at_utc
+            FROM coreiq_av_company_overview
+            WHERE ticker = :ticker
+            ORDER BY fetched_at_utc DESC
+            LIMIT 1
+        """
+        results = db_manager.execute_query(query, {"ticker": ticker})
+        
+        if not results:
+            return None
+        
+        row = results[0]
+        
+        # Parse raw_json for additional fields
+        raw_json_data = {}
+        if row.get('raw_json'):
+            try:
+                raw_json_data = json.loads(row['raw_json'])
+            except json.JSONDecodeError:
+                pass
+        
+        # Helper function to safely get float from various formats
+        def safe_float(value, default=None):
+            if value is None:
+                return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
+        # Helper function to safely get int
+        def safe_int(value, default=None):
+            if value is None:
+                return default
+            try:
+                return int(float(value))
+            except (ValueError, TypeError):
+                return default
+        
+        return CompanyOverview(
+            ticker=row['ticker'] or ticker,
+            name=row['name'] or ticker,
+            exchange=row['exchange'],
+            currency=row['currency'],
+            country=row['country'],
+            sector=row['sector'],
+            industry=row['industry'],
+            company_description=row['company_description'],
+            official_site=row['official_site'],
+            fiscal_year_end=row['fiscal_year_end'],
+            cik=row['cik'],
+            market_capitalization=safe_int(row['market_capitalization']),
+            pe_ratio=safe_float(row['pe_ratio']),
+            eps=safe_float(row['eps']),
+            dividend_yield=safe_float(row['dividend_yield']),
+            analyst_target_price=safe_float(row['analyst_target_price']),
+            fetched_at_utc=row['fetched_at_utc'],
+            # From raw_json
+            address=raw_json_data.get('Address'),
+            revenue_ttm=safe_float(raw_json_data.get('RevenueTTM')),
+            ebitda=safe_float(raw_json_data.get('EBITDA')),
+            profit_margin=safe_float(raw_json_data.get('ProfitMargin')),
+            shares_outstanding=safe_int(raw_json_data.get('SharesOutstanding')),
+            week_52_high=safe_float(raw_json_data.get('52WeekHigh')),
+            week_52_low=safe_float(raw_json_data.get('52WeekLow')),
+            dividend_per_share=safe_float(raw_json_data.get('DividendPerShare')),
+            latest_quarter=raw_json_data.get('LatestQuarter'),
+            # Placeholder fields - not in database
+            employees="N/A",
+            year_founded="N/A",
+            professionals_profiled="N/A",
+            coverage_summary="N/A",
+            coverage_list="N/A",
+            relationships="N/A",
+            projects="N/A",
+            activity_logs="N/A"
+        )
+    
+    @staticmethod
+    def company_exists(ticker: str) -> bool:
+        """Check if company overview exists for ticker."""
+        query = """
+            SELECT 1
+            FROM coreiq_av_company_overview
+            WHERE ticker = :ticker
+            LIMIT 1
+        """
+        results = db_manager.execute_query(query, {"ticker": ticker})
+        return len(results) > 0

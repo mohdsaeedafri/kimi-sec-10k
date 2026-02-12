@@ -90,3 +90,73 @@ class IncomeStatementData:
     company: Company
     periods: List[FiscalPeriod]
     line_items: List[IncomeStatementLineItem]
+
+
+@dataclass
+class CompanyOverview:
+    """Company overview data from coreiq_av_company_overview table."""
+    ticker: str
+    name: str
+    exchange: Optional[str]
+    currency: Optional[str]
+    country: Optional[str]
+    sector: Optional[str]
+    industry: Optional[str]
+    company_description: Optional[str]
+    official_site: Optional[str]
+    fiscal_year_end: Optional[str]
+    cik: Optional[str]
+    market_capitalization: Optional[int]
+    pe_ratio: Optional[float]
+    eps: Optional[float]
+    dividend_yield: Optional[float]
+    analyst_target_price: Optional[float]
+    fetched_at_utc: datetime
+    
+    # Fields from raw_json
+    address: Optional[str] = None
+    revenue_ttm: Optional[float] = None
+    ebitda: Optional[float] = None
+    profit_margin: Optional[float] = None
+    shares_outstanding: Optional[int] = None
+    week_52_high: Optional[float] = None
+    week_52_low: Optional[float] = None
+    dividend_per_share: Optional[float] = None
+    latest_quarter: Optional[str] = None
+    
+    # Placeholder fields (not in database, will show N/A)
+    employees: Optional[str] = None
+    year_founded: Optional[str] = None
+    professionals_profiled: Optional[str] = None
+    coverage_summary: Optional[str] = None
+    coverage_list: Optional[str] = None
+    relationships: Optional[str] = None
+    projects: Optional[str] = None
+    activity_logs: Optional[str] = None
+    
+    @property
+    def display_name(self) -> str:
+        """Format: 'Macy's Inc. (NYSE:M)'"""
+        exchange = self.exchange or ""
+        return f"{self.name} ({exchange}:{self.ticker})"
+    
+    @property
+    def formatted_market_cap(self) -> str:
+        """Format market cap in billions/millions."""
+        if not self.market_capitalization:
+            return "N/A"
+        if self.market_capitalization >= 1_000_000_000:
+            return f"${self.market_capitalization / 1_000_000_000:.2f}B"
+        elif self.market_capitalization >= 1_000_000:
+            return f"${self.market_capitalization / 1_000_000:.2f}M"
+        else:
+            return f"${self.market_capitalization:,}"
+    
+    @property
+    def website_display(self) -> str:
+        """Clean website URL for display - matches wireframe format (macys.com)."""
+        if not self.official_site:
+            return "N/A"
+        # Remove https://, http://, www., and trailing slashes
+        cleaned = self.official_site.replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
+        return cleaned
