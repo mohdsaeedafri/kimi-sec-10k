@@ -51,14 +51,14 @@ def main():
     [data-testid="stColumn"]:nth-of-type(3) > div {
         background-color: #EBEBEB !important;
         border-radius: 8px !important;
-        padding: 8px 16px !important;
+        padding: 8px 16px 28px 16px !important;
         width: 357px !important;
         margin: 0 auto !important;
     }
     
     /* Streamlit Selectbox Styling - White background */
     div[data-testid="stSelectbox"] {
-        margin-bottom: 11px !important;
+        margin-bottom: 8px !important;
     }
     
     div[data-testid="stSelectbox"] > label { display: none !important; }
@@ -77,6 +77,7 @@ def main():
         border-radius: 8px !important;
         min-height: 40px !important;
         height: 40px !important;
+        padding-bottom: 40px !important;
     }
     
     /* Hover and focus states */
