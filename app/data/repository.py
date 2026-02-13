@@ -8,7 +8,7 @@ import json
 from core.database import db_manager
 from data.models import (
     Company, IncomeStatementLineItem, FiscalPeriod, IncomeStatementData,
-    NewsArticle, TickerSentiment, CompanyOverview
+    NewsArticle, TickerSentiment, CompanyOverview, EarningsCall
 )
 
 
@@ -528,3 +528,203 @@ class CompanyOverviewRepository:
         """
         results = db_manager.execute_query(query, {"ticker": ticker})
         return len(results) > 0
+
+
+class EarningsCallRepository:
+    """Repository for coreiq_av_earnings_call_transcripts table."""
+    
+    @staticmethod
+    def get_companies_with_earnings() -> List[Dict[str, str]]:
+        """Get only companies that have earnings call transcripts.
+        
+        Returns:
+            List of dicts with 'ticker' and 'name' keys.
+        """
+        query = """
+            SELECT DISTINCT 
+                c.ticker,
+                COALESCE(c.name_coresight, c.name) as display_name
+            FROM coreiq_companies c
+            INNER JOIN coreiq_av_earnings_call_transcripts e ON c.ticker = e.ticker
+            WHERE e.ticker IS NOT NULL
+            ORDER BY display_name
+        """
+        results = db_manager.execute_query(query)
+        return [
+            {'ticker': row['ticker'], 'name': row['display_name']}
+            for row in results
+        ]
+    
+    @staticmethod
+    def get_earnings_calls(
+        ticker: Optional[str] = None,
+        year: Optional[int] = None,
+        quarter: Optional[int] = None,
+        has_transcript_only: bool = True,
+        limit: int = 100
+    ) -> List[EarningsCall]:
+        """Get earnings calls with optional filtering.
+        
+        Args:
+            ticker: Filter by company ticker
+            year: Filter by year
+            quarter: Filter by quarter (1-4)
+            has_transcript_only: Only return calls with transcripts
+            limit: Maximum number of results
+            
+        Returns:
+            List of EarningsCall objects
+        """
+        query = """
+            SELECT 
+                id,
+                source,
+                ticker,
+                quarter,
+                year,
+                q,
+                transcript_text,
+                has_transcript,
+                title,
+                event_datetime_utc,
+                fetched_at_utc
+            FROM coreiq_av_earnings_call_transcripts
+            WHERE 1=1
+        """
+        params = {}
+        
+        if ticker:
+            query += " AND ticker = :ticker"
+            params['ticker'] = ticker
+        
+        if year:
+            query += " AND year = :year"
+            params['year'] = year
+        
+        if quarter:
+            query += " AND q = :quarter"
+            params['quarter'] = quarter
+        
+        if has_transcript_only:
+            query += " AND has_transcript = 1"
+        
+        query += " ORDER BY year DESC, q DESC"
+        query += " LIMIT :limit"
+        params['limit'] = limit
+        
+        results = db_manager.execute_query(query, params)
+        
+        earnings_calls = []
+        for row in results:
+            earnings_calls.append(EarningsCall(
+                id=row['id'],
+                source=row['source'],
+                ticker=row['ticker'],
+                quarter=row['quarter'],
+                year=row['year'],
+                q=row['q'],
+                transcript_text=row['transcript_text'],
+                has_transcript=bool(row['has_transcript']),
+                title=row['title'],
+                event_datetime_utc=row['event_datetime_utc'],
+                fetched_at_utc=row['fetched_at_utc']
+            ))
+        
+        return earnings_calls
+    
+    @staticmethod
+    def get_earnings_call_by_id(earnings_id: int) -> Optional[EarningsCall]:
+        """Get a single earnings call by ID."""
+        query = """
+            SELECT 
+                id,
+                source,
+                ticker,
+                quarter,
+                year,
+                q,
+                transcript_text,
+                has_transcript,
+                title,
+                event_datetime_utc,
+                fetched_at_utc
+            FROM coreiq_av_earnings_call_transcripts
+            WHERE id = :id
+            LIMIT 1
+        """
+        results = db_manager.execute_query(query, {"id": earnings_id})
+        
+        if not results:
+            return None
+        
+        row = results[0]
+        return EarningsCall(
+            id=row['id'],
+            source=row['source'],
+            ticker=row['ticker'],
+            quarter=row['quarter'],
+            year=row['year'],
+            q=row['q'],
+            transcript_text=row['transcript_text'],
+            has_transcript=bool(row['has_transcript']),
+            title=row['title'],
+            event_datetime_utc=row['event_datetime_utc'],
+            fetched_at_utc=row['fetched_at_utc']
+        )
+    
+    @staticmethod
+    def get_available_years(ticker: Optional[str] = None) -> List[int]:
+        """Get distinct years available for earnings calls.
+        
+        Args:
+            ticker: Optional ticker to filter by
+            
+        Returns:
+            List of years (descending order)
+        """
+        query = """
+            SELECT DISTINCT year 
+            FROM coreiq_av_earnings_call_transcripts
+            WHERE year IS NOT NULL
+        """
+        params = {}
+        
+        if ticker:
+            query += " AND ticker = :ticker"
+            params['ticker'] = ticker
+        
+        query += " ORDER BY year DESC"
+        
+        results = db_manager.execute_query(query, params)
+        return [row['year'] for row in results]
+    
+    @staticmethod
+    def get_available_quarters(ticker: Optional[str] = None, year: Optional[int] = None) -> List[int]:
+        """Get distinct quarters available.
+        
+        Args:
+            ticker: Optional ticker to filter by
+            year: Optional year to filter by
+            
+        Returns:
+            List of quarters (1-4)
+        """
+        query = """
+            SELECT DISTINCT q 
+            FROM coreiq_av_earnings_call_transcripts
+            WHERE q IS NOT NULL
+        """
+        params = {}
+        
+        if ticker:
+            query += " AND ticker = :ticker"
+            params['ticker'] = ticker
+        
+        if year:
+            query += " AND year = :year"
+            params['year'] = year
+        
+        query += " ORDER BY q"
+        
+        results = db_manager.execute_query(query, params)
+        return [row['q'] for row in results]

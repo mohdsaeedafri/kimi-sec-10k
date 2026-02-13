@@ -34,12 +34,16 @@ def render_header(full_width: bool = True):
     # Detect which page is calling this function
     is_newsroom = False
     is_company_profile = False
+    is_earnings_calls = False
     for frame in inspect.stack():
         if 'newsroom.py' in frame.filename:
             is_newsroom = True
             break
         if 'company_profile.py' in frame.filename:
             is_company_profile = True
+            break
+        if 'earningscalls.py' in frame.filename or 'earnings_calls.py' in frame.filename:
+            is_earnings_calls = True
             break
     
     # Build header HTML - EXACT Figma specifications
@@ -156,8 +160,8 @@ html, body {
     
     <!-- Navigation: at x=568, 48px gaps between items, Roboto 18px weight 500 -->
     <nav class="coresight-header-nav">
-      <a href="http://localhost:8502/marketdata" class="''' + ('active' if not is_newsroom and not is_company_profile else '') + '''">Market Data Dashboard</a>
-      <a href="http://localhost:8502/earnings" class="">Earnings Calls</a>
+      <a href="http://localhost:8502/marketdata" class="''' + ('active' if not is_newsroom and not is_company_profile and not is_earnings_calls else '') + '''">Market Data Dashboard</a>
+      <a href="http://localhost:8504/earningscalls" class="''' + ('active' if is_earnings_calls else '') + '''">Earnings Calls</a>
       <a href="http://localhost:8503/newsroom" class="''' + ('active' if is_newsroom else '') + '''">News</a>
     </nav>
   </div>
@@ -600,9 +604,11 @@ def render_company_header(company_name: str, ticker: str, exchange: str = "NYSE"
     def on_company_change():
         selected = st.session_state.company_selector_header
         selected_ticker = company_options[selected]
-        # Update URL with new ticker
+        # Update URL with new ticker - this automatically triggers a rerun
         st.query_params["ticker"] = selected_ticker
-        st.rerun()
+        # Note: st.rerun() is not needed here because:
+        # 1. Streamlit automatically reruns after callbacks complete
+        # 2. Changing query_params also triggers a rerun
     
     # The selectbox is positioned via CSS to align with the header
     st.selectbox(
