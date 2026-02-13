@@ -418,6 +418,203 @@ def render_coresight_footer(full_width: bool = True, stick_to_bottom: bool = Tru
         st.markdown(footer_html, unsafe_allow_html=True)
 
 
+def render_company_header(company_name: str, ticker: str, exchange: str = "NYSE"):
+    """
+    Render reusable company header section with dropdown - matches Figma exactly.
+    
+    This is a centralized component that can be used on any page that needs
+    the company header with:
+    - "CORESIGHT MARKET DATA" red title
+    - Company name with dropdown
+    - Company Documents button
+    
+    Parameters:
+    -----------
+    company_name : str
+        The company display name (e.g., "Macy's Inc")
+    ticker : str
+        The stock ticker symbol (e.g., "M")
+    exchange : str, optional
+        The stock exchange (default: "NYSE")
+    
+    Usage:
+    ------
+    from components.navigation import render_company_header
+    from data.repository import CompanyRepository
+    
+    # Get company data
+    companies = CompanyRepository.get_companies()
+    
+    # Render header
+    render_company_header(
+        company_name=company.name,
+        ticker=company.ticker,
+        exchange=company.exchange or "NYSE"
+    )
+    """
+    from data.repository import CompanyRepository
+    
+    # CSS for the company header component
+    header_css = """
+    <style>
+    /* Company Header Section - reusable component */
+    .company-header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        padding: 24px 0;
+    }
+    
+    .company-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .section-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        color: #d62e2f;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .company-name-dropdown {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        color: #2d2a29;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .dropdown-arrow {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .dropdown-arrow svg {
+        width: 16px;
+        height: 16px;
+        stroke: #2d2a29;
+    }
+    
+    .company-documents-btn {
+        background-color: #d62e2f;
+        color: #ffffff;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 12px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background-color 0.2s ease;
+        height: 44px;
+    }
+    
+    .company-documents-btn:hover {
+        background-color: #b52627;
+    }
+    
+    .company-documents-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    /* Streamlit Selectbox Styling - positioned over the company name */
+    div[data-testid="stSelectbox"]:has(> div > div > input[aria-label*="Select Company"]) {
+        margin-top: -40px !important;
+        margin-bottom: 20px !important;
+        width: 400px !important;
+        opacity: 0;
+    }
+    
+    div[data-testid="stSelectbox"]:has(> div > div > input[aria-label*="Select Company"]) > div {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    div[data-testid="stSelectbox"]:has(> div > div > input[aria-label*="Select Company"]) label {
+        display: none !important;
+    }
+    
+    div[data-testid="stSelectbox"]:has(> div > div > input[aria-label*="Select Company"]) > div > div {
+        height: 30px;
+        cursor: pointer;
+    }
+    </style>
+    """
+    
+    # HTML for the header display (company name + button)
+    header_html = f'''
+    {header_css}
+    <div class="company-header-section">
+        <div class="company-header-left">
+            <div class="section-title">CORESIGHT MARKET DATA</div>
+            <div class="company-name-dropdown">
+                <span>{company_name} ({exchange}:{ticker})</span>
+                <span class="dropdown-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+            </div>
+        </div>
+        <button class="company-documents-btn">
+            <span>Company Documents</span>
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 17L17 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7 7H17V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+    '''
+    
+    # Render the HTML header
+    st.markdown(header_html, unsafe_allow_html=True)
+    
+    # Get all companies for the dropdown
+    companies = CompanyRepository.get_companies()
+    company_options = {f"{c['name']} ({c['ticker']})": c['ticker'] for c in companies}
+    current_display = f"{company_name} ({ticker})"
+    
+    # Find current index
+    option_list = list(company_options.keys())
+    current_index = option_list.index(current_display) if current_display in option_list else 0
+    
+    # Hidden Streamlit selectbox for functionality
+    # Use a callback to handle selection change
+    def on_company_change():
+        selected = st.session_state.company_selector_header
+        selected_ticker = company_options[selected]
+        # Update URL with new ticker
+        st.query_params["ticker"] = selected_ticker
+        st.rerun()
+    
+    # The selectbox is positioned via CSS to align with the header
+    st.selectbox(
+        "Select Company",
+        options=option_list,
+        index=current_index,
+        key="company_selector_header",
+        on_change=on_company_change,
+        label_visibility="collapsed"
+    )
+
+
 class Page(Enum):
     """Application pages."""
     MARKET_DATA = "market_data"

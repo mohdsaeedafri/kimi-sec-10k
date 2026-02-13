@@ -23,9 +23,9 @@ from components.styles import hide_sidebar, set_page_layout
 hide_sidebar()
 
 from components.styles import render_styles, COLORS, TYPOGRAPHY, SPACING
-from components.navigation import render_header, render_coresight_footer
+from components.navigation import render_header, render_coresight_footer, render_company_header
 from data.models import CompanyOverview
-from data.repository import CompanyOverviewRepository, CompanyRepository
+from data.repository import CompanyOverviewRepository
 from core.database import init_database
 
 
@@ -41,89 +41,6 @@ def get_company_css() -> str:
         margin: 0 auto;
         padding: 24px 0;
         font-family: 'Roboto', sans-serif;
-    }
-    
-    /* Company Header Section - matches Figma Frame 1321316478 */
-    .company-header-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 24px;
-        padding: 24px 0;
-    }
-    
-    /* Left side - Title and Company Name */
-    .company-header-left {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    
-    /* Section Title - "CORESIGHT MARKET DATA" - Montserrat 20px weight 700 #d62e2f */
-    .section-title {
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 700;
-        font-size: 20px;
-        color: #d62e2f;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        margin: 0;
-        padding: 0;
-    }
-    
-    /* Company Name with Dropdown - Montserrat 20px weight 700 #2d2a29 */
-    .company-name-dropdown {
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 700;
-        font-size: 20px;
-        color: #2d2a29;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-    }
-    
-    /* Dropdown arrow icon */
-    .dropdown-arrow {
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .dropdown-arrow svg {
-        width: 16px;
-        height: 16px;
-        stroke: #2d2a29;
-    }
-    
-    /* Company Documents Button - matches Figma exactly */
-    .company-documents-btn {
-        background-color: #d62e2f;
-        color: #ffffff;
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 700;
-        font-size: 14px;
-        padding: 12px 16px;
-        border-radius: 4px;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: background-color 0.2s ease;
-        height: 44px;
-    }
-    
-    .company-documents-btn:hover {
-        background-color: #b52627;
-    }
-    
-    /* External link icon */
-    .company-documents-btn svg {
-        width: 20px;
-        height: 20px;
     }
     
     /* Streamlit Selectbox Styling - Make it look like the Figma dropdown */
@@ -368,39 +285,6 @@ def render_business_description(description: Optional[str]) -> str:
     return html
 
 
-def render_company_header(company: CompanyOverview) -> str:
-    """Render company header with company name and Company Documents button.
-    
-    Layout per Figma node 20893:206268:
-    [Left Side]                          [Right Side]
-    CORESIGHT MARKET DATA (red)          [Company Documents Button]
-    Macy's Inc. (NYSE:M) ▼
-    """
-    html = f"""
-    <div class="company-header-section">
-        <div class="company-header-left">
-            <div class="section-title">CORESIGHT MARKET DATA</div>
-            <div class="company-name-dropdown">
-                <span>{company.name} ({company.exchange or 'NYSE'}:{company.ticker})</span>
-                <span class="dropdown-arrow">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </span>
-            </div>
-        </div>
-        <button class="company-documents-btn">
-            <span>Company Documents</span>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 17L17 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M7 7H17V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </button>
-    </div>
-    """
-    return html
-
-
 def main():
     """Company profile page entry point."""
     # Initialize
@@ -439,37 +323,11 @@ def main():
     # Page content container
     st.markdown('<div class="company-profile-container">', unsafe_allow_html=True)
     
-    # Get all companies for the dropdown
-    companies = CompanyRepository.get_companies()
-    
-    # Render the company header (title, name, and Company Documents button)
-    st.markdown(render_company_header(company), unsafe_allow_html=True)
-    
-    # Hidden Streamlit selectbox for company selection (functional)
-    # This is positioned to look like it's part of the header dropdown
-    company_options = {f"{c['name']} ({c['ticker']})": c['ticker'] for c in companies}
-    current_display = f"{company.name} ({company.ticker})"
-    
-    # Find current index
-    option_list = list(company_options.keys())
-    current_index = option_list.index(current_display) if current_display in option_list else 0
-    
-    # Use a callback to handle selection change
-    def on_company_change():
-        selected = st.session_state.company_selector
-        selected_ticker = company_options[selected]
-        if selected_ticker != ticker:
-            st.query_params["ticker"] = selected_ticker
-            st.rerun()
-    
-    # Hidden label but functional dropdown
-    st.selectbox(
-        "Select Company",
-        options=option_list,
-        index=current_index,
-        key="company_selector",
-        on_change=on_company_change,
-        label_visibility="collapsed"
+    # Render the centralized company header component (reusable across pages)
+    render_company_header(
+        company_name=company.name,
+        ticker=company.ticker,
+        exchange=company.exchange or "NYSE"
     )
     
     # Tab navigation
