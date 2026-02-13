@@ -183,6 +183,13 @@ def render_page():
     #MainMenu, footer, header, .stDeployButton {display: none !important;}
     .block-container {padding: 0 40px !important; max-width: 100% !important;}
     
+    /* Hide duplicate Streamlit button tabs (we use styled HTML tabs instead) */
+    div[data-testid="stElementContainer"].st-key-tabbtn_income_statement,
+    div[data-testid="stElementContainer"].st-key-tabbtn_key_stats,
+    div[data-testid="stElementContainer"].st-key-tabbtn_company_profile {
+        display: none !important;
+    }
+    
     /* Page title */
     .page-title {
         font-family: var(--font-family);
@@ -214,32 +221,41 @@ def render_page():
         color: var(--dark-grey);
     }
     
-    /* Tabs */
+    /* ==================== NAVIGATION TABS - FIGMA EXACT SPECS ==================== */
     .tabs-container {
         display: flex;
-        gap: 60px;
+        gap: 48px;  /* Figma spec: 48px gap between tabs */
         border-bottom: var(--border-width) solid var(--border-light);
         margin-bottom: 30px;
+        padding-top: 8px;  /* Align with Figma 80px header height */
     }
     
     .tab {
         font-family: var(--font-family);
-        font-size: var(--font-size-base);
+        font-size: var(--font-size-base);  /* 16px Body 1 */
+        font-weight: 500;  /* Medium weight from Figma */
+        line-height: 26px;  /* Figma height spec */
         padding: 12px 0;
         cursor: pointer;
         border-bottom: 3px solid transparent;
         margin-bottom: -1px;
+        transition: all 0.2s ease;
+        white-space: nowrap;
     }
     
     .tab-active {
-        color: var(--primary-red);
-        font-weight: 500;
+        color: var(--primary-red);  /* #D62E2F */
+        font-weight: 500;  /* Medium */
         border-bottom-color: var(--primary-red);
     }
     
     .tab-inactive {
-        color: var(--dark-grey);
-        font-weight: var(--font-weight-regular);
+        color: rgba(0, 0, 0, 0.6);  /* 60% opacity for inactive */
+        font-weight: 400;  /* Regular */
+    }
+    
+    .tab-inactive:hover {
+        color: rgba(0, 0, 0, 0.8);  /* Slight hover effect */
     }
     
     /* Filter row */
@@ -527,17 +543,17 @@ def render_page():
         </div>
     """)
     
-    # Hidden tab buttons
-    tab_cols = st.columns([1, 1, 1, 6])
-    for i, (tab_key, label) in enumerate([
-        ("income_statement", "Income Statement"),
-        ("key_stats", "Key Stats"),
-        ("company_profile", "Company Profile")
-    ]):
-        with tab_cols[i]:
-            if st.button(label, key=f"tabbtn_{tab_key}", type="tertiary", use_container_width=True):
-                set_marketdata_tab(tab_key)
-                st.rerun()
+    # Hidden tab buttons (COMMENTED OUT - using HTML tabs instead)
+    # tab_cols = st.columns([1, 1, 1, 6])
+    # for i, (tab_key, label) in enumerate([
+    #     ("income_statement", "Income Statement"),
+    #     ("key_stats", "Key Stats"),
+    #     ("company_profile", "Company Profile")
+    # ]):
+    #     with tab_cols[i]:
+    #         if st.button(label, key=f"tabbtn_{tab_key}", type="tertiary", use_container_width=True):
+    #             set_marketdata_tab(tab_key)
+    #             st.rerun()
     
     # ==================== FILTER ROW - DATES ONLY ====================
     date_options = [d.strftime("%B %Y") for d in available_dates]
