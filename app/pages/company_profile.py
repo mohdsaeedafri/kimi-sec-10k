@@ -25,7 +25,7 @@ hide_sidebar()
 from components.styles import render_styles, COLORS, TYPOGRAPHY, SPACING
 from components.navigation import render_header, render_coresight_footer
 from data.models import CompanyOverview
-from data.repository import CompanyOverviewRepository
+from data.repository import CompanyOverviewRepository, CompanyRepository
 from core.database import init_database
 
 
@@ -43,7 +43,23 @@ def get_company_css() -> str:
         font-family: 'Roboto', sans-serif;
     }
     
-    /* Section Title - "CORESIGHT MARKET DATA" */
+    /* Company Header Section - matches Figma Frame 1321316478 */
+    .company-header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        padding: 24px 0;
+    }
+    
+    /* Left side - Title and Company Name */
+    .company-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    /* Section Title - "CORESIGHT MARKET DATA" - Montserrat 20px weight 700 #d62e2f */
     .section-title {
         font-family: 'Montserrat', sans-serif;
         font-weight: 700;
@@ -51,40 +67,87 @@ def get_company_css() -> str:
         color: #d62e2f;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        margin-bottom: 4px;
+        margin: 0;
+        padding: 0;
     }
     
-    /* Company Name Header with Dropdown */
-    .company-header {
+    /* Company Name with Dropdown - Montserrat 20px weight 700 #2d2a29 */
+    .company-name-dropdown {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        color: #2d2a29;
         display: flex;
         align-items: center;
         gap: 4px;
-        margin-bottom: 24px;
+        cursor: pointer;
     }
     
-    .company-name {
+    /* Dropdown arrow icon */
+    .dropdown-arrow {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .dropdown-arrow svg {
+        width: 16px;
+        height: 16px;
+        stroke: #2d2a29;
+    }
+    
+    /* Company Documents Button - matches Figma exactly */
+    .company-documents-btn {
+        background-color: #d62e2f;
+        color: #ffffff;
         font-family: 'Montserrat', sans-serif;
         font-weight: 700;
-        font-size: 24px;
-        color: #323232;
-    }
-    
-    .ticker-dropdown {
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 600;
-        font-size: 20px;
-        color: #323232;
+        font-size: 14px;
+        padding: 12px 16px;
+        border-radius: 4px;
+        border: none;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 8px;
+        transition: background-color 0.2s ease;
+        height: 44px;
     }
     
-    .ticker-dropdown::after {
-        content: '▼';
-        font-size: 10px;
-        color: #888888;
-        margin-left: 4px;
+    .company-documents-btn:hover {
+        background-color: #b52627;
+    }
+    
+    /* External link icon */
+    .company-documents-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    /* Streamlit Selectbox Styling - Make it look like the Figma dropdown */
+    div[data-testid="stSelectbox"] {
+        margin-top: -85px !important;
+        margin-bottom: 20px !important;
+        width: 600px !important;
+    }
+    
+    div[data-testid="stSelectbox"] > div {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    div[data-testid="stSelectbox"] label {
+        display: none !important;
+    }
+    
+    /* Hide the actual selectbox but keep it clickable */
+    div[data-testid="stSelectbox"] > div > div {
+        opacity: 0;
+        height: 30px;
+        cursor: pointer;
     }
     
     /* Tab Navigation */
@@ -269,11 +332,14 @@ def render_info_table(company: CompanyOverview) -> str:
 
 
 def render_tabs(active_tab: str = "profile") -> str:
-    """Render the tab navigation."""
+    """Render the tab navigation - matches Figma exactly.
+    Order: Company Profile | Key Stats | Income Statement | Balance Sheet
+    """
     tabs = [
         ("profile", "Company Profile"),
+        ("stats", "Key Stats"),
         ("income", "Income Statement"),
-        ("stats", "Key Stats")
+        ("balance", "Balance Sheet")
     ]
     
     tabs_html = '<div class="tab-navigation">'
@@ -299,6 +365,39 @@ def render_business_description(description: Optional[str]) -> str:
     </div>
     """
     
+    return html
+
+
+def render_company_header(company: CompanyOverview) -> str:
+    """Render company header with company name and Company Documents button.
+    
+    Layout per Figma node 20893:206268:
+    [Left Side]                          [Right Side]
+    CORESIGHT MARKET DATA (red)          [Company Documents Button]
+    Macy's Inc. (NYSE:M) ▼
+    """
+    html = f"""
+    <div class="company-header-section">
+        <div class="company-header-left">
+            <div class="section-title">CORESIGHT MARKET DATA</div>
+            <div class="company-name-dropdown">
+                <span>{company.name} ({company.exchange or 'NYSE'}:{company.ticker})</span>
+                <span class="dropdown-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+            </div>
+        </div>
+        <button class="company-documents-btn">
+            <span>Company Documents</span>
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 17L17 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7 7H17V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+    """
     return html
 
 
@@ -340,16 +439,38 @@ def main():
     # Page content container
     st.markdown('<div class="company-profile-container">', unsafe_allow_html=True)
     
-    # Section title
-    st.markdown('<div class="section-title">CORESIGHT MARKET DATA</div>', unsafe_allow_html=True)
+    # Get all companies for the dropdown
+    companies = CompanyRepository.get_companies()
     
-    # Company header with name and ticker dropdown
-    st.markdown(f"""
-    <div class="company-header">
-        <span class="company-name">{company.name}</span>
-        <span class="ticker-dropdown">({company.exchange or 'NYSE'}:{company.ticker})</span>
-    </div>
-    """, unsafe_allow_html=True)
+    # Render the company header (title, name, and Company Documents button)
+    st.markdown(render_company_header(company), unsafe_allow_html=True)
+    
+    # Hidden Streamlit selectbox for company selection (functional)
+    # This is positioned to look like it's part of the header dropdown
+    company_options = {f"{c['name']} ({c['ticker']})": c['ticker'] for c in companies}
+    current_display = f"{company.name} ({company.ticker})"
+    
+    # Find current index
+    option_list = list(company_options.keys())
+    current_index = option_list.index(current_display) if current_display in option_list else 0
+    
+    # Use a callback to handle selection change
+    def on_company_change():
+        selected = st.session_state.company_selector
+        selected_ticker = company_options[selected]
+        if selected_ticker != ticker:
+            st.query_params["ticker"] = selected_ticker
+            st.rerun()
+    
+    # Hidden label but functional dropdown
+    st.selectbox(
+        "Select Company",
+        options=option_list,
+        index=current_index,
+        key="company_selector",
+        on_change=on_company_change,
+        label_visibility="collapsed"
+    )
     
     # Tab navigation
     st.markdown(render_tabs(active_tab="profile"), unsafe_allow_html=True)

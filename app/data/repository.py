@@ -58,6 +58,23 @@ class CompanyRepository:
             name_coresight=row['name_coresight'],
             exchange=row['exchange'],
         )
+    
+    @staticmethod
+    def get_companies() -> List[Dict[str, str]]:
+        """Get companies with ticker and name for dropdown."""
+        query = """
+            SELECT 
+                ticker,
+                COALESCE(name_coresight, name) as display_name
+            FROM coreiq_companies
+            WHERE ticker IS NOT NULL
+            ORDER BY display_name
+        """
+        results = db_manager.execute_query(query)
+        return [
+            {'ticker': row['ticker'], 'name': row['display_name']}
+            for row in results
+        ]
 
 
 class IncomeStatementRepository:

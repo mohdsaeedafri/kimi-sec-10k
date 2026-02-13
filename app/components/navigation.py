@@ -15,14 +15,14 @@ from components.styles import COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS
 
 def render_header(full_width: bool = True):
     """
-    Render Coresight header based on Figma design.
+    Render Coresight header based on Figma design - EXACT MATCH.
     
-    Figma Reference: Header (Node ID: 20895:208530)
-    - Background: #f2f2f2
-    - Height: 80px
-    - Logo: 132x60px
-    - Nav items: Market Data Dashboard, Earnings Calls, News, Community
-    - Text color: #2d2a29
+    Figma Reference: Header (Node ID: 20895:206587)
+    - Container: 1440x80px, background #f2f2f2
+    - Logo: 132x60px at x=390 (106px from left edge)
+    - Nav: Frame at x=568 with 48px gaps between items
+    - Nav items: Roboto 18px weight 500
+    - Nav text color: #2d2a29
     
     Parameters:
     -----------
@@ -42,13 +42,10 @@ def render_header(full_width: bool = True):
             is_company_profile = True
             break
     
-    # Active/inactive styles - red for active, dark for inactive
-    active_color = "#d62e2f"
-    inactive_color = "#2d2a29"
-    
-    # Build header HTML
+    # Build header HTML - EXACT Figma specifications
     header_html = '''<style>
-.coresight-header-v2 {
+/* Header full-width wrapper - background #f2f2f2 */
+.coresight-header-exact {
   background-color: #f2f2f2;
   width: 100vw;
   margin-left: calc(-50vw + 50%);
@@ -58,37 +55,49 @@ def render_header(full_width: bool = True):
   top: 0;
   z-index: 1000;
 }
+
+/* Header container - 1440px max width, centered, flex layout */
 .coresight-header-container {
-  max-width: 1350px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 20px;
   height: 80px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 46px; /* Gap from logo to nav: 568 - 390 - 132 = 46px */
+  padding-left: 106px; /* Logo at x=390 which is 106px from left edge of 1440px container */
 }
+
+/* Logo - 132x60px */
 .coresight-header-logo {
   flex-shrink: 0;
+  width: 132px;
+  height: 60px;
 }
 .coresight-header-logo img {
   width: 132px;
   height: 60px;
   object-fit: contain;
+  display: block;
 }
+
+/* Navigation - horizontal layout with 48px gaps */
 .coresight-header-nav {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 48px;
+  height: 26px;
 }
+
+/* Nav links - Roboto 18px weight 500, color #2d2a29 */
 .coresight-header-nav a {
   font-family: 'Roboto', sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
   color: #2d2a29;
   text-decoration: none;
   white-space: nowrap;
   transition: color 0.2s ease;
-  padding: 8px 0;
+  line-height: 26px;
 }
 .coresight-header-nav a:hover {
   color: #d62e2f;
@@ -96,6 +105,7 @@ def render_header(full_width: bool = True):
 .coresight-header-nav a.active {
   color: #d62e2f;
 }
+
 /* Remove default Streamlit padding */
 .stApp > header {
   display: none !important;
@@ -103,6 +113,7 @@ def render_header(full_width: bool = True):
 .main > div:first-child {
   padding-top: 0 !important;
 }
+
 /* Prevent horizontal scroll */
 html, body {
   overflow-x: hidden !important;
@@ -111,14 +122,21 @@ html, body {
 .stApp {
   overflow-x: hidden !important;
 }
+
+/* Responsive adjustments */
 @media (max-width: 1024px) {
+  .coresight-header-container {
+    padding-left: 20px;
+    gap: 30px;
+  }
   .coresight-header-nav {
-    gap: 20px;
+    gap: 24px;
   }
   .coresight-header-nav a {
     font-size: 14px;
   }
 }
+
 @media (max-width: 768px) {
   .coresight-header-nav {
     display: none;
@@ -126,19 +144,21 @@ html, body {
 }
 </style>
 
-<div class="coresight-header-v2">
+<div class="coresight-header-exact">
   <div class="coresight-header-container">
+    <!-- Logo: 132x60 at x=390 (106px from left edge) -->
     <div class="coresight-header-logo">
       <a href="https://coresight.com/">
         <img src="https://production-wordpress-cdn-dpa0g9bzd7b3h7gy.z03.azurefd.net/wp-content/uploads/2023/12/coresight-logo-1.png" 
              alt="Coresight Research" width="132" height="60">
       </a>
     </div>
+    
+    <!-- Navigation: at x=568, 48px gaps between items, Roboto 18px weight 500 -->
     <nav class="coresight-header-nav">
       <a href="http://localhost:8502/marketdata" class="''' + ('active' if not is_newsroom and not is_company_profile else '') + '''">Market Data Dashboard</a>
       <a href="http://localhost:8502/earnings" class="">Earnings Calls</a>
       <a href="http://localhost:8503/newsroom" class="''' + ('active' if is_newsroom else '') + '''">News</a>
-      <a href="http://localhost:8502/community" class="">Community</a>
     </nav>
   </div>
 </div>'''
