@@ -8,8 +8,9 @@ from datetime import date
 from typing import Optional, List
 
 from components.styles import render_styles, COLORS
-from data.repository import CompanyRepository, IncomeStatementRepository
-from data.models import IncomeStatementData, Company
+from components.toolbar import inject_toolbar
+from data.repository import CompanyRepository, IncomeStatementRepository, BalanceSheetRepository
+from data.models import IncomeStatementData, Company, BalanceSheetData
 from utils.local_storage import (
     get_marketdata_company, set_marketdata_company,
     get_marketdata_tab, set_marketdata_tab,
@@ -63,29 +64,304 @@ def get_indent_level(label: str) -> int:
 
 
 def get_conversion_rate(from_currency: str, to_currency: str) -> float:
-    """Get conversion rate between currencies."""
+    """Get conversion rate between currencies from the forex table."""
+    from data.repository import ForexRepository
+    
     if from_currency == to_currency:
         return 1.0
     
-    rates = {
-        ('USD', 'EUR'): 0.85,
-        ('USD', 'GBP'): 0.73,
-        ('USD', 'JPY'): 110.0,
-        ('USD', 'CAD'): 1.25,
-        ('USD', 'AUD'): 1.35,
-        ('USD', 'CHF'): 0.92,
-        ('USD', 'CNY'): 6.45,
-        ('USD', 'INR'): 74.5,
-        ('EUR', 'USD'): 1.18,
-        ('GBP', 'USD'): 1.37,
-        ('JPY', 'USD'): 0.0091,
-        ('CAD', 'USD'): 0.80,
-        ('AUD', 'USD'): 0.74,
-        ('CHF', 'USD'): 1.09,
-        ('CNY', 'USD'): 0.155,
-        ('INR', 'USD'): 0.0134,
+    return ForexRepository.get_conversion_rate(from_currency, to_currency)
+
+
+def is_balance_sheet_bold_row(label: str) -> bool:
+    """Check if balance sheet row should be bold (subtotal/total rows)."""
+    bold_labels = {
+        "Total Assets", "Total Liabilities", "Total Shareholder Equity",
+        "Total Current Assets", "Total Non-Current Assets",
+        "Total Current Liabilities", "Total Non-Current Liabilities"
     }
-    return rates.get((from_currency, to_currency), 1.0)
+    return label.strip() in bold_labels
+
+
+def has_balance_sheet_grey_separator(label: str) -> bool:
+    """Check if row should have grey separator after it (major totals)."""
+    separator_after = {
+        "Total Assets", "Total Liabilities", "Total Shareholder Equity"
+    }
+    return label.strip() in separator_after
+
+
+def get_balance_sheet_indent_level(label: str) -> int:
+    """Get indentation level for balance sheet rows.
+    0 = no indent (line items like Cash, Inventory)
+    1 = one indent (subtotals like Total Current Assets)
+    2 = two indents (major totals like Total Assets)
+    """
+    stripped = label.strip()
+    # Major totals - most indented
+    if stripped in {"Total Assets", "Total Liabilities", "Total Shareholder Equity"}:
+        return 2
+    # Subtotals - one indent  
+    elif stripped.startswith("Total "):
+        return 1
+    # Line items - no indent
+    else:
+        return 0
+
+
+def render_balance_sheet(ticker: str, start_date: date, end_date: date, conversion_rate: float, reported_currency: str, sort_ascending: bool = True):
+    """Render the balance sheet table."""
+    try:
+        data = BalanceSheetRepository.get_balance_sheet_data(ticker, start_date, end_date)
+        
+        # Apply sorting based on user selection
+        if not sort_ascending:
+            # Reverse the periods and corresponding values
+            data.periods = list(reversed(data.periods))
+            for item in data.line_items:
+                item.values = list(reversed(item.values))
+        
+        if data.periods and data.line_items:
+            # Build table HTML
+            html = '<div class="table-container"><div class="table-scroll"><table class="data-table"><thead>'
+            
+            # Header row
+            html += '<tr class="row-grey-separator"><th>For Fiscal Period Ending<span class="header-subtext">Millions of trading currency, except per share items.</span></th>'
+            for period in data.periods:
+                lines = period.label.split('\n')
+                if len(lines) >= 2:
+                    period_text = lines[0]
+                    date_text = lines[1]
+                else:
+                    period_text = ""
+                    date_text = period.label
+                
+                html += f'<th class="data-col"><span class="period-label">{period_text}</span><span class="period-date">{date_text}</span></th>'
+            html += '</tr></thead><tbody>'
+            
+            # Data rows with currency conversion applied
+            for i, item in enumerate(data.line_items):
+                indent = get_balance_sheet_indent_level(item.label)
+                is_bold = is_balance_sheet_bold_row(item.label)
+                has_grey_sep = has_balance_sheet_grey_separator(item.label)
+                
+                # Check if NEXT row is a total/subtotal - if so, add underline to THIS row
+                next_item = data.line_items[i + 1] if i + 1 < len(data.line_items) else None
+                needs_underline = next_item and is_balance_sheet_bold_row(next_item.label)
+                
+                # Build row classes
+                row_classes = []
+                if is_bold:
+                    row_classes.append("row-bold")
+                if needs_underline:
+                    row_classes.append("row-underline-black")
+                if has_grey_sep:
+                    row_classes.append("row-grey-separator")
+                
+                row_class_str = ' '.join(row_classes) if row_classes else ''
+                
+                html += f'<tr class="{row_class_str}">'
+                
+                # First column - label with proper indentation
+                # indent-0: no indent (line items)
+                # indent-1: one indent (subtotals like Total Current Assets)
+                # indent-2: two indents (major totals like Total Assets)
+                display_label = item.label.strip()
+                html += f'<td class="indent-{indent}">{display_label}</td>'
+                
+                # Data columns with converted values
+                for val in item.values:
+                    formatted = format_value(val, conversion_rate)
+                    html += f'<td class="data-cell">{formatted}</td>'
+                
+                html += '</tr>'
+            
+            html += '</tbody></table></div></div>'
+            st.html(html)
+            
+            # ==================== CURRENCY CONVERSION - LEFT SIDE ONLY ====================
+            st.html('<div class="currency-section"><div class="currency-label">Currency Conversion</div>')
+            
+            c1, c2, c3, c4 = st.columns([1.5, 0.3, 1.5, 6])
+            
+            with c1:
+                st.html(f'<div class="currency-box">{reported_currency}</div>')
+            
+            with c2:
+                st.html('<div class="currency-arrow">→</div>')
+            
+            with c3:
+                currencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]
+                default_index = currencies.index(st.session_state.target_currency)
+                
+                target = st.selectbox(
+                    "To",
+                    options=currencies,
+                    index=default_index,
+                    label_visibility="collapsed",
+                    key="currency_to_balance"
+                )
+                
+                if target != st.session_state.target_currency:
+                    st.session_state.target_currency = target
+                    st.rerun()
+            
+            st.html('</div>')
+            
+            if st.session_state.target_currency != reported_currency:
+                rate = get_conversion_rate(reported_currency, st.session_state.target_currency)
+                st.caption(f"Converted at 1 {reported_currency} = {rate:.4f} {st.session_state.target_currency}")
+                
+        else:
+            st.info("No balance sheet data available for the selected date range")
+            
+    except Exception as e:
+        st.error(f"Error loading balance sheet: {e}")
+
+
+def get_cash_flow_indent_level(label: str) -> int:
+    """Get indentation level for cash flow rows.
+    0 = no indent (line items)
+    1 = one indent (section totals like Operating Cash Flow)
+    2 = two indents (major totals like Net Change in Cash)
+    """
+    stripped = label.strip()
+    # Major totals - most indented
+    if stripped in {"Net Change in Cash", "Cash at End of Period"}:
+        return 2
+    # Section totals - one indent
+    elif stripped in {"Operating Cash Flow", "Investing Cash Flow", "Financing Cash Flow"}:
+        return 1
+    # Line items - no indent
+    else:
+        return 0
+
+
+def is_cash_flow_bold_row(label: str) -> bool:
+    """Check if row should be bold (totals and subtotals)."""
+    bold_labels = {
+        "Operating Cash Flow", "Investing Cash Flow", "Financing Cash Flow",
+        "Net Change in Cash", "Cash at Beginning of Period", "Cash at End of Period"
+    }
+    return label.strip() in bold_labels
+
+
+def has_cash_flow_grey_separator(label: str) -> bool:
+    """Check if row should have grey separator after it."""
+    grey_after = {
+        "Operating Cash Flow", "Investing Cash Flow", "Financing Cash Flow",
+        "Cash at End of Period"
+    }
+    return label.strip() in grey_after
+
+
+def render_cash_flow(ticker: str, start_date: date, end_date: date, conversion_rate: float, reported_currency: str, sort_ascending: bool = True):
+    """Render the cash flow statement table."""
+    try:
+        from data.repository import CashFlowRepository
+        
+        data = CashFlowRepository.get_cash_flow_data(ticker, start_date, end_date)
+        
+        # Apply sorting based on user selection
+        if not sort_ascending:
+            # Reverse the periods and corresponding values
+            data.periods = list(reversed(data.periods))
+            for item in data.line_items:
+                item.values = list(reversed(item.values))
+        
+        if data.periods and data.line_items:
+            # Build table HTML
+            html = '<div class="table-container"><div class="table-scroll"><table class="data-table"><thead>'
+            
+            # Header row
+            html += '<tr class="row-grey-separator"><th>For Fiscal Period Ending<span class="header-subtext">Millions of trading currency, except per share items.</span></th>'
+            for period in data.periods:
+                lines = period.label.split('\n')
+                if len(lines) >= 2:
+                    period_text = lines[0]
+                    date_text = lines[1]
+                else:
+                    period_text = ""
+                    date_text = period.label
+                
+                html += f'<th class="data-col"><span class="period-label">{period_text}</span><span class="period-date">{date_text}</span></th>'
+            html += '</tr></thead><tbody>'
+            
+            # Data rows with currency conversion applied
+            for i, item in enumerate(data.line_items):
+                indent = get_cash_flow_indent_level(item.label)
+                is_bold = is_cash_flow_bold_row(item.label)
+                has_grey_sep = has_cash_flow_grey_separator(item.label)
+                
+                # Check if NEXT row is a total/subtotal - if so, add underline to THIS row
+                next_item = data.line_items[i + 1] if i + 1 < len(data.line_items) else None
+                needs_underline = next_item and is_cash_flow_bold_row(next_item.label)
+                
+                # Build row classes
+                row_classes = []
+                if is_bold:
+                    row_classes.append("row-bold")
+                if needs_underline:
+                    row_classes.append("row-underline-black")
+                if has_grey_sep:
+                    row_classes.append("row-grey-separator")
+                
+                row_class_str = ' '.join(row_classes) if row_classes else ''
+                
+                html += f'<tr class="{row_class_str}">'
+                
+                # First column - label with proper indentation
+                display_label = item.label.strip()
+                html += f'<td class="indent-{indent}">{display_label}</td>'
+                
+                # Data columns with converted values
+                for val in item.values:
+                    formatted = format_value(val, conversion_rate)
+                    html += f'<td class="data-cell">{formatted}</td>'
+                
+                html += '</tr>'
+            
+            html += '</tbody></table></div></div>'
+            st.html(html)
+            
+            # ==================== CURRENCY CONVERSION - LEFT SIDE ONLY ====================
+            st.html('<div class="currency-section"><div class="currency-label">Currency Conversion</div>')
+            
+            c1, c2, c3, c4 = st.columns([1.5, 0.3, 1.5, 6])
+            
+            with c1:
+                st.html(f'<div class="currency-box">{reported_currency}</div>')
+            
+            with c2:
+                st.html('<div class="currency-arrow">→</div>')
+            
+            with c3:
+                currencies = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]
+                default_index = currencies.index(st.session_state.target_currency)
+                
+                target = st.selectbox(
+                    "To",
+                    options=currencies,
+                    index=default_index,
+                    label_visibility="collapsed",
+                    key="currency_to_cashflow"
+                )
+                
+                if target != st.session_state.target_currency:
+                    st.session_state.target_currency = target
+                    st.rerun()
+            
+            st.html('</div>')
+            
+            if st.session_state.target_currency != reported_currency:
+                rate = get_conversion_rate(reported_currency, st.session_state.target_currency)
+                st.caption(f"Converted at 1 {reported_currency} = {rate:.4f} {st.session_state.target_currency}")
+                
+        else:
+            st.info("No cash flow data available for the selected date range")
+            
+    except Exception as e:
+        st.error(f"Error loading cash flow statement: {e}")
 
 
 def render_page():
@@ -107,23 +383,46 @@ def render_page():
         companies[0]
     )
     
+    # Check for URL query param tab first, then fall back to stored tab
+    query_tab = st.query_params.get("tab")
     stored_tab = get_marketdata_tab()
-    selected_tab = stored_tab if stored_tab in [
-        "income_statement", "key_stats", "company_profile"
-    ] else "income_statement"
     
-    # Get dates
-    min_date, max_date = IncomeStatementRepository.get_date_range(selected_ticker)
-    available_dates = IncomeStatementRepository.get_available_dates(selected_ticker)
+    selected_tab = query_tab if query_tab in [
+        "income_statement", "balance_sheet", "cash_flow", "key_stats", "company_profile"
+    ] else (stored_tab if stored_tab in [
+        "income_statement", "balance_sheet", "cash_flow", "key_stats", "company_profile"
+    ] else "income_statement")
+    
+    # Get dates based on selected tab
+    if selected_tab == "balance_sheet":
+        min_date, max_date = BalanceSheetRepository.get_date_range(selected_ticker)
+        available_dates = BalanceSheetRepository.get_available_dates(selected_ticker)
+    elif selected_tab == "cash_flow":
+        from data.repository import CashFlowRepository
+        min_date, max_date = CashFlowRepository.get_date_range(selected_ticker)
+        available_dates = CashFlowRepository.get_available_dates(selected_ticker)
+    else:
+        min_date, max_date = IncomeStatementRepository.get_date_range(selected_ticker)
+        available_dates = IncomeStatementRepository.get_available_dates(selected_ticker)
     
     stored_start, stored_end = get_marketdata_date_range()
     start_date = date.fromisoformat(stored_start) if stored_start else min_date
     end_date = date.fromisoformat(stored_end) if stored_end else max_date
     
-    # Get currency from database
-    reported_currency = IncomeStatementRepository.get_reported_currency(
-        selected_ticker, end_date
-    ) or "USD"
+    # Get currency from database based on tab
+    if selected_tab == "balance_sheet":
+        reported_currency = BalanceSheetRepository.get_reported_currency(
+            selected_ticker, end_date
+        ) or "USD"
+    elif selected_tab == "cash_flow":
+        from data.repository import CashFlowRepository
+        reported_currency = CashFlowRepository.get_reported_currency(
+            selected_ticker, end_date
+        ) or "USD"
+    else:
+        reported_currency = IncomeStatementRepository.get_reported_currency(
+            selected_ticker, end_date
+        ) or "USD"
     
     # Initialize session state for target currency if not exists
     if 'target_currency' not in st.session_state:
@@ -181,7 +480,20 @@ def render_page():
     
     /* Hide Streamlit elements */
     #MainMenu, footer, header, .stDeployButton {display: none !important;}
-    .block-container {padding: 0 40px !important; max-width: 100% !important;}
+    
+    /* Main content container - 110px left/right padding per Figma */
+    .block-container {
+        padding-left: 110px !important; 
+        padding-right: 110px !important; 
+        max-width: 1440px !important;
+        margin: 0 auto !important;
+    }
+    
+    /* Ensure main container has proper padding */
+    .main .block-container {
+        padding-left: 110px !important;
+        padding-right: 110px !important;
+    }
     
     /* Hide duplicate Streamlit button tabs (we use styled HTML tabs instead) */
     div[data-testid="stElementContainer"].st-key-tabbtn_income_statement,
@@ -190,7 +502,7 @@ def render_page():
         display: none !important;
     }
     
-    /* Page title */
+    /* Page title - aligned to 110px left margin */
     .page-title {
         font-family: var(--font-family);
         font-weight: var(--font-weight-bold);
@@ -198,7 +510,8 @@ def render_page():
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--primary-red);
-        margin: 30px 0 4px 0;
+        margin: 32px 0 4px 0;
+        padding-left: 0;
     }
     
     /* Company selector */
@@ -206,7 +519,8 @@ def render_page():
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 25px;
+        margin-bottom: 24px;
+        padding-left: 0;
     }
     
     .company-name {
@@ -258,13 +572,69 @@ def render_page():
         color: rgba(0, 0, 0, 0.8);  /* Slight hover effect */
     }
     
-    /* Filter row */
-    .date-label {
+    /* Filter row - Figma Design Match */
+    .filter-label {
         font-family: var(--font-family);
-        font-size: var(--font-size-small);
-        font-weight: var(--font-weight-regular);
-        color: var(--dark-grey);
+        font-size: 12px;
+        font-weight: 400;
+        color: #4F4F4F;
         margin-bottom: 6px;
+        margin-top: 0;
+        line-height: normal;
+        display: block;
+        padding-top: 12px;
+    }
+    
+    /* Streamlit selectbox styling to match Figma */
+    div[data-testid="stSelectbox"] {
+        margin-top: 0 !important;
+    }
+    
+    /* Override the selectbox container */
+    div[data-testid="stSelectbox"] > div[data-baseweb="select"] {
+        background-color: #F2F2F2 !important;
+        border-radius: 4px !important;
+        border: none !important;
+        height: 36px !important;
+        min-height: 36px !important;
+    }
+    
+    /* Override the inner control */
+    div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div {
+        background-color: #F2F2F2 !important;
+        border-radius: 4px !important;
+        border: none !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        padding: 0 10px !important;
+    }
+    
+    /* Override the input text - prevent truncation */
+    div[data-testid="stSelectbox"] > div[data-baseweb="select"] input {
+        font-family: 'Roboto', sans-serif !important;
+        font-size: 14px !important;
+        color: #000000 !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+    }
+    
+    /* Override the value container - ensure full text is shown */
+    div[data-testid="stSelectbox"] > div[data-baseweb="select"] > div > div:nth-child(2) {
+        padding: 0 !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+        white-space: nowrap !important;
+    }
+    
+    /* Ensure selectbox value text is not truncated */
+    div[data-testid="stSelectbox"] [data-baseweb="select"] span {
+        text-overflow: clip !important;
+        overflow: visible !important;
+    }
+    
+    /* Override the dropdown indicator */
+    div[data-testid="stSelectbox"] > div[data-baseweb="select"] svg {
+        color: #4F4F4F !important;
     }
     
     /* Streamlit selectbox styling */
@@ -417,13 +787,17 @@ def render_page():
     }
     
     /* ========== ROW INDENTATION ========== */
+    /* Reversed: Line items = no indent, Totals = indented */
     .indent-0 { 
-        padding-left: var(--padding-normal) !important; 
+        padding-left: 8px !important; 
     }
     
     .indent-1 { 
-        padding-left: var(--padding-indented) !important; 
-        background-color: var(--light-grey) !important;
+        padding-left: 40px !important; 
+    }
+    
+    .indent-2 { 
+        padding-left: 80px !important; 
     }
     
     /* ========== BOLD ROWS (Subtotals) ========== */
@@ -458,9 +832,8 @@ def render_page():
     }
     
     /* ========== GREY SEPARATOR - 4px thick ========== */
-    .row-grey-separator td,
-    .row-grey-separator th {
-        border-bottom: 4px solid #CFCFCF;
+    .row-grey-separator td {
+        border-bottom: 4px solid #9CA3AF !important;
     }
     
     /* ========== CURRENCY CONVERSION - LEFT SIDE ONLY ========== */
@@ -505,43 +878,97 @@ def render_page():
     # ==================== TITLE SECTION ====================
     st.html(f'<div class="page-title">CORESIGHT MARKET DATA</div>')
     
-    col_title, col_select = st.columns([4, 1])
-    with col_title:
-        st.html(f"""
-            <div class="company-selector">
-                <span class="company-name">{selected_company.display_name}</span>
+    # Company selector - custom HTML with Streamlit selectbox overlay
+    company_options = {c.display_name: c.ticker for c in companies}
+    current_display = selected_company.display_name
+    
+    # Custom HTML display
+    st.html(f"""
+        <style>
+        .company-selector-container {{
+            position: relative;
+            height: 40px;
+            margin-bottom: 24px;
+        }}
+        .company-selector-display {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 600;
+            font-size: 22px;
+            color: #000;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            pointer-events: none;
+        }}
+        .dropdown-chevron {{
+            font-size: 12px;
+            color: #4F4F4F;
+        }}
+        /* Hide the Streamlit selectbox but keep it clickable */
+        .company-select-overlay div[data-testid="stSelectbox"] {{
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            max-width: 500px;
+            height: 40px;
+            z-index: 2;
+            cursor: pointer;
+        }}
+        .company-select-overlay div[data-testid="stSelectbox"] > div {{
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            height: 40px !important;
+            min-height: 40px !important;
+        }}
+        .company-select-overlay div[data-testid="stSelectbox"] label {{
+            display: none !important;
+        }}
+        </style>
+        <div class="company-selector-container">
+            <div class="company-selector-display">
+                <span>{selected_company.display_name}</span>
                 <span class="dropdown-chevron">▼</span>
             </div>
-        """)
-    
-    with col_select:
-        company_options = {c.display_name: c.ticker for c in companies}
-        current_display = selected_company.display_name
-        
-        new_display = st.selectbox(
-            "Company",
-            options=list(company_options.keys()),
-            index=list(company_options.keys()).index(current_display),
-            label_visibility="collapsed",
-            key="company_sel"
-        )
-        new_ticker = company_options[new_display]
-        
-        if new_ticker != selected_ticker:
-            set_marketdata_company(new_ticker)
-            new_min, new_max = IncomeStatementRepository.get_date_range(new_ticker)
-            if new_min and new_max:
-                set_marketdata_date_range(new_min.isoformat(), new_max.isoformat())
-            st.rerun()
-    
-    # ==================== TABS ====================
-    st.html("""
-        <div class="tabs-container">
-            <div class="tab tab-active">Income Statement</div>
-            <div class="tab tab-inactive">Key Stats</div>
-            <div class="tab tab-inactive">Company Profile</div>
+            <div class="company-select-wrapper"></div>
         </div>
     """)
+    
+    # Streamlit selectbox positioned over the custom display (invisible but functional)
+    new_display = st.selectbox(
+        "Company",
+        options=list(company_options.keys()),
+        index=list(company_options.keys()).index(current_display),
+        label_visibility="collapsed",
+        key="company_sel_marketdata"
+    )
+    
+    new_ticker = company_options[new_display]
+    
+    if new_ticker != selected_ticker:
+        set_marketdata_company(new_ticker)
+        new_min, new_max = IncomeStatementRepository.get_date_range(new_ticker)
+        if new_min and new_max:
+            set_marketdata_date_range(new_min.isoformat(), new_max.isoformat())
+        st.rerun()
+    
+    # ==================== TOOLBAR ====================
+    # Map tab keys to page names for the toolbar
+    tab_to_page = {
+        "company_profile": "Company Profile",
+        "key_stats": "Key Stats",
+        "income_statement": "Income Statement",
+        "balance_sheet": "Balance Sheet",
+        "cash_flow": "Cash Flow"
+    }
+    active_page = tab_to_page.get(selected_tab, "Income Statement")
+    inject_toolbar(active_page=active_page)
     
     # Hidden tab buttons (COMMENTED OUT - using HTML tabs instead)
     # tab_cols = st.columns([1, 1, 1, 6])
@@ -555,7 +982,11 @@ def render_page():
     #             set_marketdata_tab(tab_key)
     #             st.rerun()
     
-    # ==================== FILTER ROW - DATES ONLY ====================
+    # ==================== FILTER ROW - DATES & SORT ====================
+    # Initialize sort state
+    if 'sort_order' not in st.session_state:
+        st.session_state.sort_order = "Earliest"
+    
     date_options = [d.strftime("%B %Y") for d in available_dates]
     date_values = {d.strftime("%B %Y"): d for d in available_dates}
     
@@ -565,10 +996,12 @@ def render_page():
     curr_end = end_date.strftime("%B %Y")
     end_idx = date_options.index(curr_end) if curr_end in date_options else len(date_options) - 1
     
-    f1, f2, f3 = st.columns([6, 1.2, 1.2])
+    # Create columns: [spacer, Start Date, End Date, Sort]
+    # Wider columns to prevent text truncation - adjusted ratios for proper display
+    f1, f2, f3, f4 = st.columns([4, 2, 2, 1.5])
     
     with f2:
-        st.html('<div class="date-label">Start Date</div>')
+        st.html('<div class="filter-label">Start Date</div>')
         new_start_label = st.selectbox(
             "Start",
             options=date_options,
@@ -579,7 +1012,7 @@ def render_page():
         new_start_date = date_values.get(new_start_label, start_date)
     
     with f3:
-        st.html('<div class="date-label">End Date</div>')
+        st.html('<div class="filter-label">End Date</div>')
         new_end_label = st.selectbox(
             "End",
             options=date_options,
@@ -589,20 +1022,52 @@ def render_page():
         )
         new_end_date = date_values.get(new_end_label, end_date)
     
-    # Update dates if changed
-    if new_start_date != start_date or new_end_date != end_date:
+    with f4:
+        st.html('<div class="filter-label">Sort</div>')
+        new_sort_order = st.selectbox(
+            "Sort",
+            options=["Earliest", "Latest"],
+            index=0 if st.session_state.sort_order == "Earliest" else 1,
+            label_visibility="collapsed",
+            key="sort_order_select"
+        )
+    
+    # Update states if changed
+    date_changed = new_start_date != start_date or new_end_date != end_date
+    sort_changed = new_sort_order != st.session_state.sort_order
+    
+    if date_changed:
         if new_start_date > new_end_date:
             st.error("Start date must be before end date")
         else:
             set_marketdata_date_range(new_start_date.isoformat(), new_end_date.isoformat())
+            if sort_changed:
+                st.session_state.sort_order = new_sort_order
             st.rerun()
+    elif sort_changed:
+        st.session_state.sort_order = new_sort_order
+        st.rerun()
     
     # ==================== TABLE WITH CURRENCY CONVERSION ====================
-    if selected_tab in ["income_statement", "key_stats"]:
+    # Apply sort order to data
+    sort_ascending = st.session_state.sort_order == "Earliest"
+    
+    if selected_tab == "balance_sheet":
+        render_balance_sheet(selected_ticker, start_date, end_date, conversion_rate, reported_currency, sort_ascending)
+    elif selected_tab == "cash_flow":
+        render_cash_flow(selected_ticker, start_date, end_date, conversion_rate, reported_currency, sort_ascending)
+    elif selected_tab in ["income_statement", "key_stats"]:
         try:
             data = IncomeStatementRepository.get_income_statement_data(
                 selected_ticker, start_date, end_date
             )
+            
+            # Apply sorting based on user selection
+            if not sort_ascending:
+                # Reverse the periods and corresponding values
+                data.periods = list(reversed(data.periods))
+                for item in data.line_items:
+                    item.values = list(reversed(item.values))
             
             if data.periods and data.line_items:
                 # Build table HTML

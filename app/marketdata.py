@@ -48,6 +48,15 @@ def main():
     # Initialize
     initialize_app()
     
+    # Handle query parameters for tab切换 - sync to local_storage but DON'T delete query param
+    # This avoids the "Page not found" error from Streamlit's query param handling
+    query_params = st.query_params
+    if "tab" in query_params:
+        tab = query_params["tab"]
+        if tab in ["income_statement", "balance_sheet", "cash_flow", "key_stats", "company_profile"]:
+            from utils.local_storage import set_marketdata_tab
+            set_marketdata_tab(tab)
+    
     # Render global styles
     render_styles()
     

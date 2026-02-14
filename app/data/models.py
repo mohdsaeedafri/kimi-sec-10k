@@ -163,6 +163,42 @@ class CompanyOverview:
 
 
 @dataclass
+class BalanceSheetLineItem:
+    """Balance sheet line item for display."""
+    label: str
+    key: str  # Database column name
+    values: List[Optional[float]]  # Values for each period
+    is_calculated: bool = False
+    section: str = ""  # 'assets', 'liabilities', 'equity'
+
+
+@dataclass
+class BalanceSheetData:
+    """Complete balance sheet data for a company."""
+    company: Company
+    periods: List[FiscalPeriod]
+    line_items: List[BalanceSheetLineItem]
+
+
+@dataclass
+class CashFlowLineItem:
+    """Cash flow statement line item for display."""
+    label: str
+    key: str  # Database column name or raw_json key
+    values: List[Optional[float]]  # Values for each period
+    is_calculated: bool = False
+    section: str = ""  # 'operating', 'investing', 'financing'
+
+
+@dataclass
+class CashFlowData:
+    """Complete cash flow statement data for a company."""
+    company: Company
+    periods: List[FiscalPeriod]
+    line_items: List[CashFlowLineItem]
+
+
+@dataclass
 class EarningsCall:
     """Earnings call transcript model from coreiq_av_earnings_call_transcripts table."""
     id: int

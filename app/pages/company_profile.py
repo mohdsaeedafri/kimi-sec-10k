@@ -24,6 +24,7 @@ hide_sidebar()
 
 from components.styles import render_styles, COLORS, TYPOGRAPHY, SPACING
 from components.navigation import render_header, render_coresight_footer, render_company_header
+from components.toolbar import inject_toolbar
 from data.models import CompanyOverview
 from data.repository import CompanyOverviewRepository
 from core.database import init_database
@@ -330,8 +331,8 @@ def main():
         exchange=company.exchange or "NYSE"
     )
     
-    # Tab navigation
-    st.markdown(render_tabs(active_tab="profile"), unsafe_allow_html=True)
+    # Toolbar navigation
+    inject_toolbar(active_page="Company Profile")
     
     # Info table
     st.markdown(render_info_table(company), unsafe_allow_html=True)

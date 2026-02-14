@@ -175,6 +175,27 @@ Stores annual income statement data from Alpha Vantage.
 | interest_income | DECIMAL | Interest income |
 | ... | ... | Additional financial fields |
 
+### coreiq_av_financials_balance_sheet Table
+Stores balance sheet data from Alpha Vantage (using raw_json for flexibility).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| ticker | VARCHAR | Stock ticker |
+| fiscal_date_ending | DATE | Fiscal period end date |
+| report_type | VARCHAR | annual/quarterly |
+| raw_json | JSON | All balance sheet fields as JSON |
+| reported_currency | VARCHAR | Currency code (USD, etc.) |
+
+**JSON Structure**: The `raw_json` column contains camelCase keys like:
+- `cashAndCashEquivalentsAtCarryingValue`
+- `totalCurrentAssets`
+- `totalAssets`
+- `currentAccountsPayable`
+- `totalLiabilities`
+- `commonStock`
+- `retainedEarnings`
+- `totalShareholderEquity`
+
 ---
 
 ## Code Organization Patterns
@@ -195,6 +216,12 @@ class CompanyRepository:
 class IncomeStatementRepository:
     @staticmethod
     def get_income_statement_data(ticker: str, start_date: date, end_date: date) -> IncomeStatementData: ...
+
+class BalanceSheetRepository:
+    LINE_ITEMS = [...]  # Maps UI labels to JSON keys
+    
+    @staticmethod
+    def get_balance_sheet_data(ticker: str, start_date: date, end_date: date) -> BalanceSheetData: ...
 ```
 
 ### 2. Component Architecture
@@ -482,6 +509,129 @@ tests/
 3. Configure production database credentials
 4. Verify database connection pooling settings
 5. Ensure all SQL files are imported to MySQL
+
+---
+
+## Current Implementation Status
+
+### Completed Features
+
+| Feature | Status | Location | Notes |
+|---------|--------|----------|-------|
+| Balance Sheet | ✅ Complete | `app/data/repository.py`, `app/pages/market_data.py` | Full implementation with raw JSON parsing |
+| Sort Filter | ✅ Complete | `app/pages/market_data.py` | Earliest/Latest dropdown for table columns |
+| Date Filters | ✅ Complete | `app/pages/market_data.py` | Start Date, End Date dropdowns |
+| Income Statement | ✅ Complete | `app/pages/market_data.py` | Full implementation |
+| Tab Navigation | ✅ Complete | `app/pages/market_data.py` | Fixed URLs to use `/?tab=` format |
+| Newsroom | ✅ Complete | `app/pages/newsroom.py` | Standalone news page |
+
+### Balance Sheet Implementation Details
+
+**Files**:
+- `app/data/repository.py` - `BalanceSheetRepository` class (lines ~200-350)
+- `app/pages/market_data.py` - `render_balance_sheet()` function (lines ~370-600)
+
+**Key Features**:
+1. **Data Source**: Uses `raw_json` column from MySQL table `coreiq_av_financials_balance_sheet`
+2. **JSON Parsing**: Maps camelCase JSON keys to UI labels
+3. **Visual Hierarchy**:
+   - Line items: 0px indent
+   - Subtotals (e.g., "Total Current Assets"): 20px indent
+   - Totals (e.g., "Total Assets"): 40px indent
+4. **Underlines**: Black 90% width underline appears on row BEFORE each total/subtotal
+5. **Separators**: 4px grey border after major totals (Total Assets, Total Liabilities, Equity)
+
+**LINE_ITEMS Mapping** (in `BalanceSheetRepository`):
+```python
+LINE_ITEMS = [
+    # ASSETS
+    ("Cash & Cash Equivalents", "cashAndCashEquivalentsAtCarryingValue", "assets"),
+    ("Total Current Assets", "totalCurrentAssets", "assets"),
+    ("Total Assets", "totalAssets", "assets"),
+    
+    # LIABILITIES  
+    ("Current Accounts Payable", "currentAccountsPayable", "liabilities"),
+    ("Total Liabilities", "totalLiabilities", "liabilities"),
+    
+    # EQUITY
+    ("Common Stock", "commonStock", "equity"),
+    ("Total Shareholder Equity", "totalShareholderEquity", "equity"),
+]
+```
+
+### Sort Filter Implementation
+
+**Location**: `app/pages/market_data.py` (lines ~785-850)
+
+**Session State**:
+```python
+st.session_state.sort_order = "Earliest"  # or "Latest"
+```
+
+**Behavior**:
+- "Earliest" = Chronological order (2006 → 2025)
+- "Latest" = Reverse chronological (2025 → 2006)
+- Applied to both Income Statement and Balance Sheet
+
+---
+
+## Agent Handoff Guide
+
+### If You Are a New Agent Taking Over
+
+**STEP 1: Read Documentation**
+1. Read `STATUS.md` - Current project status and what's been implemented
+2. Read `AGENTS.md` - This file for architecture details
+3. Read `README.md` - High-level project overview
+
+**STEP 2: Check Database Connection**
+```bash
+# Verify MySQL is running
+mysql -u root -p -e "SHOW DATABASES;"
+
+# Check tables exist
+mysql -u root -p secfiling -e "SHOW TABLES;"
+```
+
+**STEP 3: Run the Application**
+```bash
+cd /Users/mohdsaeedafri/Documents/Documents/Code-Base/kimi-sec-10k-1/app
+streamlit run marketdata.py --server.port=8502
+```
+
+**STEP 4: Test Current Features**
+1. Navigate to Balance Sheet tab
+2. Verify data loads correctly
+3. Test Sort filter (Earliest/Latest)
+4. Check Start Date/End Date filters
+5. Verify formatting (indents, underlines, grey separators)
+
+**STEP 5: Continue Development**
+- Next priority: Cash Flow Statement (similar to Balance Sheet)
+- Reference: `STATUS.md` for detailed implementation notes
+
+### Token Expiration Plan
+
+If your tokens expire mid-task:
+
+1. **Current Status Is Documented**:
+   - `STATUS.md` always reflects the latest state
+   - `AGENTS.md` contains architecture details
+   - Git commits preserve code changes
+
+2. **Resume Workflow**:
+   ```bash
+   # New agent should:
+   git status                    # Check what files were modified
+   git diff                      # Review changes
+   cat STATUS.md                 # Read current status
+   cat AGENTS.md | grep -A 20 "Agent Handoff"  # Read handoff guide
+   ```
+
+3. **Key Files to Check**:
+   - `app/pages/market_data.py` - Main page implementation
+   - `app/data/repository.py` - Data access layer
+   - `STATUS.md` - Current implementation status
 
 ---
 
